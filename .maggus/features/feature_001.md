@@ -33,12 +33,12 @@ Implementation of the core reverse proxy with Kestrel as edge server and TurboHT
 **Parallel:** yes — can run alongside other features
 
 **Acceptance Criteria:**
-- [ ] `DomainConfig` record with domain name, redirect mode, options
-- [ ] `UpstreamTarget` record with URL, weight, max connections
-- [ ] `RouteDefinition` record mapping domain to upstream(s)
-- [ ] Value objects for DomainName, UpstreamUrl with validation
-- [ ] All models are immutable records
-- [ ] Typecheck/lint passes
+- [x] `DomainConfig` record with domain name, redirect mode, options
+- [x] `UpstreamTarget` record with URL, weight, max connections
+- [x] `RouteDefinition` record mapping domain to upstream(s)
+- [x] Value objects for DomainName, UpstreamUrl with validation
+- [x] All models are immutable records
+- [x] Typecheck/lint passes
 
 ---
 
@@ -52,12 +52,12 @@ Implementation of the core reverse proxy with Kestrel as edge server and TurboHT
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] `DomainRouterActor` with in-memory routing state
-- [ ] Messages: `UpdateRoutes`, `ResolveUpstream`, `RemoveDomain`
-- [ ] Routing lookup by Host header in O(1) via Dictionary
-- [ ] Publishes events on routing changes via EventStream
-- [ ] Unit tests with Akka.TestKit
-- [ ] Typecheck/lint passes
+- [x] `DomainRouterActor` with in-memory routing state
+- [x] Messages: `UpdateRoutes`, `ResolveUpstream`, `RemoveDomain`
+- [x] Routing lookup by Host header in O(1) via Dictionary
+- [x] Publishes events on routing changes via EventStream
+- [x] Unit tests with Akka.TestKit
+- [x] Typecheck/lint passes
 
 ---
 
@@ -70,11 +70,11 @@ Implementation of the core reverse proxy with Kestrel as edge server and TurboHT
 **Parallel:** yes — can run alongside TASK-001-002
 
 **Acceptance Criteria:**
-- [ ] Uses Akka.NET `RoundRobinPool` or `RoundRobinGroup` router for upstream distribution
-- [ ] Considers weight parameter per upstream (via routee configuration)
-- [ ] Skips unhealthy upstreams (dynamic routee removal/addition)
-- [ ] Unit tests for distribution and edge cases (single upstream, all unhealthy)
-- [ ] Typecheck/lint passes
+- [x] Uses Akka.NET `RoundRobinPool` or `RoundRobinGroup` router for upstream distribution
+- [x] Considers weight parameter per upstream (via routee configuration)
+- [x] Skips unhealthy upstreams (dynamic routee removal/addition)
+- [x] Unit tests for distribution and edge cases (single upstream, all unhealthy)
+- [x] Typecheck/lint passes
 
 ---
 
@@ -88,15 +88,15 @@ Implementation of the core reverse proxy with Kestrel as edge server and TurboHT
 **Model:** opus
 
 **Acceptance Criteria:**
-- [ ] TurboHTTP integrated as NuGet package reference
-- [ ] `RequestForwardingPipeline` converts Kestrel HttpContext to HttpRequestMessage
-- [ ] Response body is streamed (not buffered)
-- [ ] Proxy headers set: X-Forwarded-For, X-Real-IP, X-Forwarded-Proto, X-Forwarded-Host
-- [ ] Hop-by-hop headers correctly filtered (Connection, Keep-Alive, etc.)
-- [ ] Timeout handling for upstream connections
-- [ ] Error handling: 502 Bad Gateway on upstream error, 504 Gateway Timeout
-- [ ] Unit tests for header manipulation
-- [ ] Typecheck/lint passes
+- [x] TurboHTTP integrated as NuGet package reference
+- [x] `RequestForwardingPipeline` converts Kestrel HttpContext to HttpRequestMessage
+- [x] Response body is streamed (not buffered)
+- [x] Proxy headers set: X-Forwarded-For, X-Real-IP, X-Forwarded-Proto, X-Forwarded-Host
+- [x] Hop-by-hop headers correctly filtered (Connection, Keep-Alive, etc.)
+- [x] Timeout handling for upstream connections
+- [x] Error handling: 502 Bad Gateway on upstream error, 504 Gateway Timeout
+- [x] Unit tests for header manipulation
+- [x] Typecheck/lint passes
 
 ---
 

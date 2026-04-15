@@ -47,3 +47,14 @@ TestResult.xml
 
 ## Docker
 **/docker-compose*.override.yml
+.maggus/runs
+.maggus/logs/
+.maggus/MEMORY.md
+.maggus/RELEASE_NOTES.md
+.maggus/usage*.csv
+.maggus/usage_*.jsonl
+.maggus/feature_approvals.yml
+.maggus/daemon.pid
+.maggus/interactive.lock
+.maggus/worktrees/
+COMMIT.md

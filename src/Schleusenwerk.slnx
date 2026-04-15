@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="Schleusenwerk/Schleusenwerk.csproj" />
+  <Folder Name="/Items/">
+    <File Path="../.dockerignore" />
+    <File Path="../.gitignore" />
+    <File Path="../README.md" />
+    <File Path="global.json" />
+  </Folder>
+  <Project Path="Schleusenwerk.Tests/Schleusenwerk.Tests.csproj" />
+</Solution>

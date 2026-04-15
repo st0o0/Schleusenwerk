@@ -2,22 +2,24 @@
     <PropertyGroup>
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
-
-    <PropertyGroup Label="SharedVersions">
-        <AkkaVersion>1.5.65</AkkaVersion>
-        <XunitVersion>3.2.2</XunitVersion>
-    </PropertyGroup>
-
     <ItemGroup Label="Akka.NET">
-        <PackageVersion Include="Akka.Hosting" Version="$(AkkaVersion)" />
+        <PackageVersion Include="Akka.Streams" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Cluster.Hosting" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Cluster.Sharding" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Persistence.Sql" Version="1.5.62"/>
+        <PackageVersion Include="Akka.TestKit.Xunit" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Persistence.TestKit.Xunit" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Hosting.TestKit" Version="1.5.65"/>
     </ItemGroup>
-
+    <ItemGroup Label="DI">
+        <PackageVersion Include="Servus.Akka" Version="0.3.10"/>
+        <PackageVersion Include="Servus.Core" Version="0.33.2"/>
+    </ItemGroup>
     <ItemGroup Label="HTTP">
-        <PackageVersion Include="TurboHTTP" Version="0.1.0" />
+        <PackageVersion Include="TurboHTTP" Version="0.1.0"/>
     </ItemGroup>
-
     <ItemGroup Label="Testing">
-        <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.5.2" />
-        <PackageVersion Include="xunit.v3.mtp-v2" Version="$(XunitVersion)" />
+        <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.5.2"/>
+        <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2"/>
     </ItemGroup>
 </Project>

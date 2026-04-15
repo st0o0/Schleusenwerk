@@ -35,6 +35,13 @@ UI              (Schleusenwerk/UI/)        — Blazor Server under /manage, Sign
 Discovery       (Schleusenwerk/Discovery/) — Docker socket watcher, label parser, conflict resolver
 ```
 
+## Servus.Akka — Known Non-Functional APIs
+
+The `Servus.Akka` package is installed but several APIs do **not** compile and must not be used:
+- `ActorRef<T>` (typed actor ref) — unusable
+
+**Use instead:** `IActorRef` constructor parameter + `registry.Register<T>()` (standard Akka.Hosting pattern).
+
 ## Key Technology Decisions
 
 - **Persistence:** Akka.Persistence (event-sourced) — no Entity Framework, no direct DB access
@@ -42,6 +49,12 @@ Discovery       (Schleusenwerk/Discovery/) — Docker socket watcher, label pars
 - **Load Balancing:** Akka.NET RoundRobinPool/RoundRobinGroup — no custom balancer
 - **TLS:** Kestrel SNI ServerCertificateSelector, Certes for ACME v2
 - **UI:** Blazor Server (same process), SignalR for real-time updates from actors
+- **Akka Configuration:** Akka.Hosting C# API only — **no HOCON**. All actor system configuration,
+  persistence setup, clustering, serialization, and dispatchers must be configured via
+  `AkkaConfigurationBuilder` methods in C#. Never use HOCON strings, `.conf` files, or
+  `ConfigurationFactory.ParseString()`. Use `WithActors()`, `WithClustering()`,
+  `WithSqlPersistence()`, etc. Exception: `PersistenceTestKit` base class handles
+  test persistence config internally — do not add manual HOCON for test journal/snapshot setup.
 
 ## Workflow Rules
 
@@ -68,9 +81,15 @@ Discovery       (Schleusenwerk/Discovery/) — Docker socket watcher, label pars
 
 New tests use **component-based folders** (`Routing/`, `Persistence/`, `Certificates/`, `Discovery/`, `UI/`). Key rules:
 - `Spec` suffix, `sealed` class, BDD method names: `Subject_should_behavior()`
-- `[Trait("Feature", "001")]` for traceability, `[Fact(Timeout = 5000)]` required
+- `[Fact(Timeout = 5000)]` required
 - Max 500 lines per test class
-- Akka.TestKit for all actor tests
+- **TestKit base classes:** `Akka.TestKit.Xunit.TestKit` for non-persistence actor tests,
+  `Akka.Persistence.TestKit.PersistenceTestKit` (from `Akka.Persistence.TestKit.Xunit`) for
+  persistence actor tests — auto-configures TestJournal/TestSnapshotStore, no HOCON needed
+- **Actor DI in tests:** Actors use `IRequiredActor<T>` — use shared `TestRequiredActor<T>`
+  helper (`Schleusenwerk.Tests/TestRequiredActor.cs`) and `Props.Create(() => new Actor(...))`
+  instead of static `Props()` factories
+- No raw `ActorSystem.Create` in tests — always use TestKit base class
 
 ## Agent Guidance: dotnet-skills
 

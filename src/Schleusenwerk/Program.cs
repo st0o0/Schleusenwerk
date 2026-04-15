@@ -1,18 +1,10 @@
-using Akka.Hosting;
-using Schleusenwerk.Infrastructure.Forwarding;
-using TurboHTTP;
+using Schleusenwerk.Startup;
+using Servus.Core.Application.Startup;
 
-var builder = WebApplication.CreateBuilder(args);
+var runner = AppBuilder.Create()
+    .WithSetup<SchleusenwerkActorSystemSetup>()
+    .WithSetup<SchleusenwerkServicesSetup>()
+    .WithSetup<SchleusenwerkApplicationSetup>()
+    .Build();
 
-builder.Services.AddTurboHttpClient();
-builder.Services.AddSingleton<RequestForwardingPipeline>();
-
-builder.Services.AddAkka("schleusenwerk", (configurationBuilder, provider) =>
-{
-});
-
-var app = builder.Build();
-
-app.MapGet("/health", () => Results.Ok("healthy"));
-
-app.Run();
+await runner.RunAsync();

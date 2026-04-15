@@ -1,0 +1,27 @@
+agent: claude
+model: sonnet
+include: []
+approval_mode: opt-in
+auto_continue: null
+session_persistence: null
+parallel: null
+max_log_files: 0
+notifications:
+    sound: false
+    on_task_complete: null
+    on_run_complete: null
+    on_error: null
+git:
+    auto_branch: null
+    protected_branches:
+        - main
+        - master
+        - dev
+    check_sync: null
+on_complete:
+    feature: ""
+    bug: ""
+hooks:
+    on_feature_complete: []
+    on_bug_complete: []
+    on_task_complete: []

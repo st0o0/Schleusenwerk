@@ -2,15 +2,18 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <IsTestProject>true</IsTestProject>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
-        <PackageReference Include="xunit.v3.mtp-v2" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage"/>
+        <PackageReference Include="xunit.v3.mtp-v2"/>
+        <PackageReference Include="Akka.TestKit.Xunit"/>
+        <PackageReference Include="Akka.Persistence.TestKit.Xunit"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Schleusenwerk\Schleusenwerk.csproj" />
+        <ProjectReference Include="..\Schleusenwerk\Schleusenwerk.csproj"/>
     </ItemGroup>
 
 </Project>

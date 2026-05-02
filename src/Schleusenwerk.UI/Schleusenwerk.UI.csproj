@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <ItemGroup>
+        <ProjectReference Include="..\Schleusenwerk.Core\Schleusenwerk.Core.csproj" />
+    </ItemGroup>
+
+</Project>

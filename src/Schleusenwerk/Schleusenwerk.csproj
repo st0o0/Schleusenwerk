@@ -2,12 +2,15 @@
 
     <ItemGroup>
         <PackageReference Include="Akka.Streams" />
-        <PackageReference Include="Akka.Cluster.Hosting" />
-        <PackageReference Include="Akka.Cluster.Sharding" />
-        <PackageReference Include="Akka.Persistence.Sql" />
+        <PackageReference Include="Akka.Persistence.Sql.Hosting" />
+        <PackageReference Include="Microsoft.Data.Sqlite" />
         <PackageReference Include="TurboHTTP" />
         <PackageReference Include="Servus.Akka" />
         <PackageReference Include="Servus.Core" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Schleusenwerk.Core\Schleusenwerk.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -4,8 +4,8 @@ WORKDIR /build
 
 COPY src/ ./src/
 
-RUN dotnet restore ./src/Schleusenwerk/Schleusenwerk.csproj && \
-    dotnet publish ./src/Schleusenwerk/Schleusenwerk.csproj \
+RUN dotnet restore ./src/Schleusenwerk.UI/Schleusenwerk.UI.csproj && \
+    dotnet publish ./src/Schleusenwerk.UI/Schleusenwerk.UI.csproj \
         --configuration Release \
         --output /app \
         --no-restore
@@ -17,8 +17,8 @@ WORKDIR /app
 COPY --from=build /app .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80;https://+:443;grpc://+:5000
+ENV ASPNETCORE_URLS=http://+:8080
 
-EXPOSE 80 443 5000
+EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Schleusenwerk.dll"]
+ENTRYPOINT ["dotnet", "Schleusenwerk.UI.dll"]

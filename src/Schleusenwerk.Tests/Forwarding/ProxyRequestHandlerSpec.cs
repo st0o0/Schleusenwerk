@@ -2,11 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Channels;
 using Akka.Actor;
-using Akka.DependencyInjection;
 using Akka.Hosting;
 using Akka.TestKit.Xunit;
 using Microsoft.AspNetCore.Http;
 using Schleusenwerk.Forwarding;
+using Schleusenwerk.LoadBalancing;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using TurboHTTP;
@@ -29,7 +29,10 @@ public sealed class ProxyRequestHandlerSpec : TestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
         _registry.Register<EventHub>(hub, overwrite: true);
 
-        var router = Sys.ActorOf(Props.Create<DomainRouterActor>(), $"router-{Guid.NewGuid():N}");
+        var router = Sys.ActorOf(
+            Props.Create(() => new DomainRouterActor(
+                upstreams => Props.Create(() => new LoadBalancerActor(upstreams)))),
+            $"router-{Guid.NewGuid():N}");
         _registry.Register<DomainRouterActor>(router, overwrite: true);
 
         return router;

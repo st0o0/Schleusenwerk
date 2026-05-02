@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Akka.Actor;
 using Akka.Hosting;
 using Schleusenwerk.Routing;
@@ -7,8 +6,8 @@ namespace Schleusenwerk.Forwarding;
 
 /// <summary>
 /// ASP.NET Core middleware that orchestrates the full proxy pipeline:
-/// host resolution via DomainRouterActor, round-robin upstream selection,
-/// request forwarding via TurboHTTP, and response header manipulation.
+/// host resolution via DomainRouterActor, request forwarding via TurboHTTP,
+/// and response header manipulation.
 /// </summary>
 internal sealed class ProxyRequestHandler
 {
@@ -17,7 +16,6 @@ internal sealed class ProxyRequestHandler
     private readonly RequestForwardingPipeline _forwardingPipeline;
     private readonly HeaderManipulationFilter _headerFilter;
     private readonly WebSocketTunnel _webSocketTunnel;
-    private readonly ConcurrentDictionary<DomainName, int> _roundRobinCounters = new();
     private static readonly TimeSpan AskTimeout = TimeSpan.FromSeconds(5);
 
     public ProxyRequestHandler(
@@ -52,7 +50,7 @@ internal sealed class ProxyRequestHandler
         switch (response)
         {
             case UpstreamResolved resolved:
-                await HandleResolvedRoute(context, resolved.Route);
+                await HandleResolvedRoute(context, resolved.Target, resolved.Config);
                 break;
 
             case UpstreamNotFound:
@@ -65,20 +63,11 @@ internal sealed class ProxyRequestHandler
         }
     }
 
-    private async Task HandleResolvedRoute(HttpContext context, RouteDefinition route)
+    private async Task HandleResolvedRoute(HttpContext context, UpstreamTarget upstream, DomainConfig config)
     {
-        var config = route.Config;
-
         if (ShouldRedirectToHttps(context, config))
         {
             RedirectToHttps(context, config);
-            return;
-        }
-
-        var upstream = SelectUpstream(route);
-        if (upstream is null)
-        {
-            context.Response.StatusCode = StatusCodes.Status502BadGateway;
             return;
         }
 
@@ -88,8 +77,7 @@ internal sealed class ProxyRequestHandler
             return;
         }
 
-        await _forwardingPipeline.ForwardAsync(context, upstream, config);
-        _headerFilter.Apply(context.Response.Headers);
+        await _forwardingPipeline.ForwardAsync(context, upstream, config, _headerFilter);
     }
 
     private static bool ShouldRedirectToHttps(HttpContext context, DomainConfig config)
@@ -106,28 +94,6 @@ internal sealed class ProxyRequestHandler
 
         context.Response.StatusCode = (int)config.HttpRedirect;
         context.Response.Headers.Location = httpsUrl;
-    }
-
-    private UpstreamTarget? SelectUpstream(RouteDefinition route)
-    {
-        var upstreams = route.Upstreams;
-        if (upstreams.Count == 0)
-        {
-            return null;
-        }
-
-        if (upstreams.Count == 1)
-        {
-            return upstreams[0];
-        }
-
-        var counter = _roundRobinCounters.AddOrUpdate(
-            route.DomainName,
-            _ => 0,
-            (_, current) => current + 1);
-
-        var index = Math.Abs(counter % upstreams.Count);
-        return upstreams[index];
     }
 }
 

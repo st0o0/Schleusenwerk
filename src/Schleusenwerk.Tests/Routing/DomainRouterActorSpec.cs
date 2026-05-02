@@ -1,8 +1,8 @@
 using Akka.Actor;
-using Akka.DependencyInjection;
 using Akka.Hosting;
 using Akka.TestKit.Xunit;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.LoadBalancing;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
@@ -24,7 +24,10 @@ public sealed class DomainRouterActorSpec : TestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
         _registry.Register<EventHub>(hub, overwrite: true);
 
-        var router = Sys.ActorOf(Props.Create<DomainRouterActor>(), $"router-{Guid.NewGuid():N}");
+        var router = Sys.ActorOf(
+            Props.Create(() => new DomainRouterActor(
+                upstreams => Props.Create(() => new LoadBalancerActor(upstreams)))),
+            $"router-{Guid.NewGuid():N}");
         _registry.Register<DomainRouterActor>(router, overwrite: true);
 
         return router;
@@ -47,8 +50,8 @@ public sealed class DomainRouterActorSpec : TestKit
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        Assert.Equal("example.com", result.Route.DomainName.Value);
-        Assert.Single(result.Route.Upstreams);
+        Assert.Equal("example.com", result.Config.DomainName.Value);
+        Assert.NotNull(result.Target);
     }
 
     [Fact(Timeout = 5000)]
@@ -61,7 +64,7 @@ public sealed class DomainRouterActorSpec : TestKit
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("Example.COM"), Timeout);
 
-        Assert.Equal("example.com", result.Route.DomainName.Value);
+        Assert.Equal("example.com", result.Config.DomainName.Value);
     }
 
     [Fact(Timeout = 5000)]
@@ -84,7 +87,7 @@ public sealed class DomainRouterActorSpec : TestKit
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("api.example.com"), Timeout);
 
-        Assert.Equal("*.example.com", result.Route.DomainName.Value);
+        Assert.Equal("*.example.com", result.Config.DomainName.Value);
     }
 
     [Fact(Timeout = 5000)]
@@ -111,7 +114,7 @@ public sealed class DomainRouterActorSpec : TestKit
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("api.example.com"), Timeout);
 
-        Assert.Equal("api.example.com", result.Route.DomainName.Value);
+        Assert.Equal("api.example.com", result.Config.DomainName.Value);
     }
 
     [Fact(Timeout = 5000)]
@@ -126,7 +129,7 @@ public sealed class DomainRouterActorSpec : TestKit
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        Assert.Equal("http://new:9090/", result.Route.Upstreams[0].Url.Value.ToString());
+        Assert.Equal("http://new:9090/", result.Target.Url.Value.ToString());
     }
 
     [Fact(Timeout = 5000)]
@@ -141,8 +144,8 @@ public sealed class DomainRouterActorSpec : TestKit
         var resultA = await router.Ask<UpstreamResolved>(new ResolveUpstream("a.com"), Timeout);
         var resultB = await router.Ask<UpstreamResolved>(new ResolveUpstream("b.com"), Timeout);
 
-        Assert.Equal("a.com", resultA.Route.DomainName.Value);
-        Assert.Equal("b.com", resultB.Route.DomainName.Value);
+        Assert.Equal("a.com", resultA.Config.DomainName.Value);
+        Assert.Equal("b.com", resultB.Config.DomainName.Value);
     }
 
     [Fact(Timeout = 5000)]
@@ -164,10 +167,8 @@ public sealed class DomainRouterActorSpec : TestKit
     {
         var router = CreateRouter();
 
-        // Should not crash the actor
         router.Tell(new Schleusenwerk.Routing.RemoveDomain(DomainName.Parse("nonexistent.com")));
 
-        // Actor is still alive — verify by asking it
         var result = await router.Ask<UpstreamNotFound>(new ResolveUpstream("nonexistent.com"), Timeout,
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("nonexistent.com", result.Host);
@@ -217,7 +218,6 @@ public sealed class DomainRouterActorSpec : TestKit
         var router = CreateRouter();
         router.Tell(new Schleusenwerk.Routing.RemoveDomain(DomainName.Parse("nonexistent.com")));
 
-        // Ensure actor has processed the message by asking it something
         await router.Ask<UpstreamNotFound>(new ResolveUpstream("nonexistent.com"), Timeout,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -225,17 +225,25 @@ public sealed class DomainRouterActorSpec : TestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task ResolveUpstream_should_return_all_upstreams()
+    public async Task ResolveUpstream_should_round_robin_across_all_upstreams()
     {
         var router = CreateRouter();
         var route = CreateRoute("example.com", "http://a:8080", "http://b:9090", "http://c:7070");
 
         router.Tell(new UpdateRoutes([route]));
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout,
-            cancellationToken: TestContext.Current.CancellationToken);
+        var hosts = new HashSet<string>();
+        for (var i = 0; i < 9; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
+            hosts.Add(result.Target.Url.Host);
+        }
 
-        Assert.Equal(3, result.Route.Upstreams.Count);
+        Assert.Equal(3, hosts.Count);
+        Assert.Contains("a", hosts);
+        Assert.Contains("b", hosts);
+        Assert.Contains("c", hosts);
     }
 
     [Fact(Timeout = 5000)]
@@ -247,16 +255,16 @@ public sealed class DomainRouterActorSpec : TestKit
         var route = CreateRoute("health.com", "http://healthy:8080", "http://sick:9090");
 
         router.Tell(new UpdateRoutes([route]));
-        // Allow subscription handshake to complete
         await Task.Delay(150);
 
         hub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://sick:9090"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("health.com"), Timeout);
-
-        Assert.Single(result.Route.Upstreams);
-        Assert.Equal("http://healthy:8080/", result.Route.Upstreams[0].Url.Value.ToString());
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("health.com"), Timeout);
+            Assert.Equal("healthy", result.Target.Url.Host);
+        }
     }
 
     [Fact(Timeout = 5000)]
@@ -271,13 +279,19 @@ public sealed class DomainRouterActorSpec : TestKit
         await Task.Delay(150);
 
         hub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://b:9090"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
         hub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://b:9090"), IsHealthy: true));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("recover.com"), Timeout);
+        var hosts = new HashSet<string>();
+        for (var i = 0; i < 6; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("recover.com"), Timeout);
+            hosts.Add(result.Target.Url.Host);
+        }
 
-        Assert.Equal(2, result.Route.Upstreams.Count);
+        Assert.Contains("a", hosts);
+        Assert.Contains("b", hosts);
     }
 
     private sealed class EventSubscriberActor<T> : ReceiveActor

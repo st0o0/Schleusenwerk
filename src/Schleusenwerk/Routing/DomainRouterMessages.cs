@@ -18,7 +18,7 @@ public sealed record RemoveDomain(DomainName DomainName);
 /// <summary>
 /// Result of a successful upstream resolution.
 /// </summary>
-public sealed record UpstreamResolved(RouteDefinition Route);
+public sealed record UpstreamResolved(UpstreamTarget Target, DomainConfig Config);
 
 /// <summary>
 /// Result when no upstream is found for the requested host.

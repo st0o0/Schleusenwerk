@@ -1,8 +1,8 @@
 using Akka.Actor;
-using Akka.DependencyInjection;
 using Akka.Hosting;
 using Akka.TestKit.Xunit;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.LoadBalancing;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
@@ -26,7 +26,13 @@ public sealed class DomainRouterHealthSpec : TestKit
         _currentHub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
         _registry.Register<EventHub>(_currentHub, overwrite: true);
 
-        return Sys.ActorOf(Props.Create<DomainRouterActor>(), $"router-{Guid.NewGuid():N}");
+        var router = Sys.ActorOf(
+            Props.Create(() => new DomainRouterActor(
+                upstreams => Props.Create(() => new LoadBalancerActor(upstreams)))),
+            $"router-{Guid.NewGuid():N}");
+        _registry.Register<DomainRouterActor>(router, overwrite: true);
+
+        return router;
     }
 
     private static RouteDefinition CreateRoute(string domain, params string[] upstreams)
@@ -44,19 +50,16 @@ public sealed class DomainRouterHealthSpec : TestKit
 
         router.Tell(new UpdateRoutes([route]));
 
-        // Ensure actor is fully started and routes are loaded before publishing health events
         await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        // Mark upstream 'a' as unhealthy via EventHubActor
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
+        await Task.Delay(150);
 
-        // Allow event processing
-        await Task.Delay(100);
-
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
-
-        Assert.Single(result.Route.Upstreams);
-        Assert.Equal("b", result.Route.Upstreams[0].Url.Host);
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
+            Assert.Equal("b", result.Target.Url.Host);
+        }
     }
 
     [Fact(Timeout = 5000)]
@@ -69,7 +72,7 @@ public sealed class DomainRouterHealthSpec : TestKit
         await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
         var result = await router.Ask<UpstreamNotFound>(new ResolveUpstream("example.com"), Timeout);
         Assert.Equal("example.com", result.Host);
@@ -84,15 +87,20 @@ public sealed class DomainRouterHealthSpec : TestKit
         router.Tell(new UpdateRoutes([route]));
         await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        // Mark unhealthy then healthy
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: true));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
+        var hosts = new HashSet<string>();
+        for (var i = 0; i < 6; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
+            hosts.Add(result.Target.Url.Host);
+        }
 
-        Assert.Equal(2, result.Route.Upstreams.Count);
+        Assert.Contains("a", hosts);
+        Assert.Contains("b", hosts);
     }
 
     [Fact(Timeout = 5000)]
@@ -105,14 +113,11 @@ public sealed class DomainRouterHealthSpec : TestKit
         router.Tell(new UpdateRoutes([routeA, routeB]));
         await router.Ask<UpstreamResolved>(new ResolveUpstream("a.com"), Timeout);
 
-        // Mark upstream for domain A as unhealthy
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        // Domain B should still resolve normally
         var resultB = await router.Ask<UpstreamResolved>(new ResolveUpstream("b.com"), Timeout);
-        Assert.Single(resultB.Route.Upstreams);
-        Assert.Equal("b", resultB.Route.Upstreams[0].Url.Host);
+        Assert.Equal("b", resultB.Target.Url.Host);
     }
 
     [Fact(Timeout = 5000)]
@@ -125,12 +130,13 @@ public sealed class DomainRouterHealthSpec : TestKit
         await router.Ask<UpstreamResolved>(new ResolveUpstream("api.example.com"), Timeout);
 
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://b:9090"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("api.example.com"), Timeout);
-
-        Assert.Single(result.Route.Upstreams);
-        Assert.Equal("a", result.Route.Upstreams[0].Url.Host);
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("api.example.com"), Timeout);
+            Assert.Equal("a", result.Target.Url.Host);
+        }
     }
 
     [Fact(Timeout = 5000)]
@@ -142,15 +148,15 @@ public sealed class DomainRouterHealthSpec : TestKit
         router.Tell(new UpdateRoutes([route]));
         await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        // Send duplicate unhealthy events
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://a:8080"), IsHealthy: false));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
-        var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
-
-        Assert.Single(result.Route.Upstreams);
-        Assert.Equal("b", result.Route.Upstreams[0].Url.Host);
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
+            Assert.Equal("b", result.Target.Url.Host);
+        }
     }
 
     [Fact(Timeout = 5000)]
@@ -162,11 +168,10 @@ public sealed class DomainRouterHealthSpec : TestKit
         router.Tell(new UpdateRoutes([route]));
         await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
 
-        // Healthy event for upstream not in any route — should not cause issues
         _currentHub.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://unknown:9999"), IsHealthy: true));
-        await Task.Delay(100);
+        await Task.Delay(150);
 
         var result = await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), Timeout);
-        Assert.Single(result.Route.Upstreams);
+        Assert.Equal("a", result.Target.Url.Host);
     }
 }

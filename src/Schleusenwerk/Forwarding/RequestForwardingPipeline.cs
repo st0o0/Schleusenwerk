@@ -18,7 +18,7 @@ internal sealed class RequestForwardingPipeline
         _clientFactory = clientFactory;
     }
 
-    public async Task ForwardAsync(HttpContext context, UpstreamTarget upstream, DomainConfig config)
+    public async Task ForwardAsync(HttpContext context, UpstreamTarget upstream, DomainConfig config, HeaderManipulationFilter? headerFilter = null)
     {
         var cancellationToken = context.RequestAborted;
 
@@ -67,10 +67,15 @@ internal sealed class RequestForwardingPipeline
             context.Response.StatusCode = StatusCodes.Status502BadGateway;
             return;
         }
+        catch (TurboHttpException)
+        {
+            context.Response.StatusCode = StatusCodes.Status502BadGateway;
+            return;
+        }
 
         using (upstreamResponse)
         {
-            await CopyResponseAsync(context.Response, upstreamResponse, cancellationToken);
+            await CopyResponseAsync(context.Response, upstreamResponse, headerFilter, cancellationToken);
         }
     }
 
@@ -141,7 +146,7 @@ internal sealed class RequestForwardingPipeline
     }
 
     private static async Task CopyResponseAsync(
-        HttpResponse target, HttpResponseMessage source, CancellationToken cancellationToken)
+        HttpResponse target, HttpResponseMessage source, HeaderManipulationFilter? headerFilter, CancellationToken cancellationToken)
     {
         target.StatusCode = (int)source.StatusCode;
 
@@ -160,6 +165,9 @@ internal sealed class RequestForwardingPipeline
                 continue;
             target.Headers.Append(header.Key, header.Value.ToArray());
         }
+
+        // Apply header manipulation before committing the response (body write commits headers)
+        headerFilter?.Apply(target.Headers);
 
         // Stream the response body without buffering
         await using var upstreamStream = await source.Content.ReadAsStreamAsync(cancellationToken);

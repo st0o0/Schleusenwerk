@@ -3,6 +3,7 @@ using Akka.Event;
 using Akka.Hosting;
 using Akka.Streams;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.LoadBalancing;
 using Schleusenwerk.Persistence;
 using Servus.Akka;
 
@@ -10,19 +11,24 @@ namespace Schleusenwerk.Routing;
 
 /// <summary>
 /// Manages the routing table and resolves incoming host headers to upstream targets.
-/// Subscribes to IClusterEvent via EventHubActor to receive UpstreamHealthChanged events.
-/// Thread-safe via actor model — all state mutations happen inside the actor's mailbox.
+/// Spawns one LoadBalancerActor child per domain. Delegates upstream selection to the child.
+/// Subscribes to EventHub to receive UpstreamHealthChanged events and forwards them to children.
 /// </summary>
 public sealed class DomainRouterActor : ReceiveActor, IWithUnboundedStash
 {
+    private static readonly TimeSpan SelectTimeout = TimeSpan.FromSeconds(5);
+
     private readonly ILoggingAdapter _log = Context.GetLogger();
     private readonly IActorRef _eventHub;
+    private readonly Func<IReadOnlyList<UpstreamTarget>, Props> _loadBalancerPropsFactory;
     private readonly Dictionary<DomainName, RouteDefinition> _routes = new();
+    private readonly Dictionary<DomainName, IActorRef> _loadBalancers = new();
     private readonly HashSet<UpstreamUrl> _unhealthyUpstreams = [];
     public IStash Stash { get; set; } = null!;
 
-    public DomainRouterActor()
+    public DomainRouterActor(Func<IReadOnlyList<UpstreamTarget>, Props> loadBalancerPropsFactory)
     {
+        _loadBalancerPropsFactory = loadBalancerPropsFactory;
         _eventHub = Context.GetActor<EventHub>();
         WaitingForSubscription();
     }
@@ -70,6 +76,19 @@ public sealed class DomainRouterActor : ReceiveActor, IWithUnboundedStash
         {
             _routes[route.DomainName] = route;
             updatedDomains.Add(route.DomainName);
+
+            if (_loadBalancers.TryGetValue(route.DomainName, out var existing))
+            {
+                existing.Tell(new UpdateUpstreams(route.Upstreams));
+            }
+            else
+            {
+                var lb = Context.ActorOf(
+                    _loadBalancerPropsFactory(route.Upstreams),
+                    SanitizeActorName(route.DomainName.Value));
+                _loadBalancers[route.DomainName] = lb;
+            }
+
             _log.Info("Route updated for domain {Domain} with {Count} upstream(s)",
                 route.DomainName, route.Upstreams.Count);
         }
@@ -80,45 +99,52 @@ public sealed class DomainRouterActor : ReceiveActor, IWithUnboundedStash
     private void Handle(ResolveUpstream msg)
     {
         var host = msg.Host;
+        var sender = Sender;
 
-        // Try exact match first (O(1) dictionary lookup)
-        if (DomainName.TryParse(host, out var domainName) && _routes.TryGetValue(domainName, out var route))
+        if (DomainName.TryParse(host, out var domainName) && _loadBalancers.TryGetValue(domainName, out var lb))
         {
-            var filtered = FilterHealthyUpstreams(route);
-            if (filtered is not null)
-            {
-                Sender.Tell(new UpstreamResolved(filtered));
-                return;
-            }
-
-            Sender.Tell(new UpstreamNotFound(host));
+            var config = _routes[domainName].Config;
+            lb.Ask<object>(SelectUpstream.Instance, SelectTimeout)
+                .PipeTo(sender,
+                    success: result => result switch
+                    {
+                        UpstreamSelected sel => (object)new UpstreamResolved(sel.Target, config),
+                        _ => new UpstreamNotFound(host)
+                    },
+                    failure: _ => new UpstreamNotFound(host));
             return;
         }
 
-        // Try wildcard match — iterate wildcard entries only
+        // Try wildcard match
         foreach (var kvp in _routes)
         {
-            if (kvp.Key.IsWildcard && kvp.Key.Matches(host))
+            if (kvp.Key.IsWildcard && kvp.Key.Matches(host) && _loadBalancers.TryGetValue(kvp.Key, out var wlb))
             {
-                var filtered = FilterHealthyUpstreams(kvp.Value);
-                if (filtered is not null)
-                {
-                    Sender.Tell(new UpstreamResolved(filtered));
-                    return;
-                }
-
-                Sender.Tell(new UpstreamNotFound(host));
+                var config = kvp.Value.Config;
+                wlb.Ask<object>(SelectUpstream.Instance, SelectTimeout)
+                    .PipeTo(sender,
+                        success: result => result switch
+                        {
+                            UpstreamSelected sel => (object)new UpstreamResolved(sel.Target, config),
+                            _ => new UpstreamNotFound(host)
+                        },
+                        failure: _ => new UpstreamNotFound(host));
                 return;
             }
         }
 
-        Sender.Tell(new UpstreamNotFound(host));
+        sender.Tell(new UpstreamNotFound(host));
     }
 
     private void Handle(RemoveDomain msg)
     {
         if (_routes.Remove(msg.DomainName))
         {
+            if (_loadBalancers.Remove(msg.DomainName, out var lb))
+            {
+                Context.Stop(lb);
+            }
+
             _log.Info("Route removed for domain {Domain}", msg.DomainName);
             Context.System.EventStream.Publish(new RouteRemoved(msg.DomainName));
         }
@@ -128,41 +154,34 @@ public sealed class DomainRouterActor : ReceiveActor, IWithUnboundedStash
     {
         if (msg.IsHealthy)
         {
-            if (_unhealthyUpstreams.Remove(msg.Url))
-            {
-                _log.Info("Upstream {Url} marked healthy", msg.Url);
-            }
+            _unhealthyUpstreams.Remove(msg.Url);
+            _log.Info("Upstream {Url} marked healthy", msg.Url);
         }
         else
         {
-            if (_unhealthyUpstreams.Add(msg.Url))
+            _unhealthyUpstreams.Add(msg.Url);
+            _log.Warning("Upstream {Url} marked unhealthy", msg.Url);
+        }
+
+        // Forward to each load balancer that owns this upstream
+        foreach (var kvp in _routes)
+        {
+            if (kvp.Value.Upstreams.Any(u => u.Url == msg.Url) && _loadBalancers.TryGetValue(kvp.Key, out var lb))
             {
-                _log.Warning("Upstream {Url} marked unhealthy", msg.Url);
+                if (msg.IsHealthy)
+                {
+                    lb.Tell(new MarkUpstreamHealthy(msg.Url));
+                }
+                else
+                {
+                    lb.Tell(new MarkUpstreamUnhealthy(msg.Url));
+                }
             }
         }
     }
 
-    private RouteDefinition? FilterHealthyUpstreams(RouteDefinition route)
+    private static string SanitizeActorName(string name)
     {
-        if (_unhealthyUpstreams.Count == 0)
-        {
-            return route;
-        }
-
-        var healthyUpstreams = route.Upstreams
-            .Where(u => !_unhealthyUpstreams.Contains(u.Url))
-            .ToList();
-
-        if (healthyUpstreams.Count == 0)
-        {
-            return null;
-        }
-
-        if (healthyUpstreams.Count == route.Upstreams.Count)
-        {
-            return route;
-        }
-
-        return RouteDefinition.Create(route.Config, healthyUpstreams);
+        return new string(name.Select(c => char.IsLetterOrDigit(c) || c == '-' ? c : '_').ToArray());
     }
 }

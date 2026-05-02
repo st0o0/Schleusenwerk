@@ -3,6 +3,7 @@ using Akka.Persistence.Sql.Hosting;
 using LinqToDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Schleusenwerk.Discovery;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Servus.Akka.Startup;
@@ -30,6 +31,9 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
 
             var config = system.ActorOf(resolver.Props<ConfigurationPersistenceActor>(), "configuration");
             registry.Register<ConfigurationPersistenceActor>(config);
+
+            var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
+            registry.Register<DockerDiscoveryActor>(dockerDiscovery);
         });
     }
 }

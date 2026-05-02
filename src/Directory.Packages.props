@@ -19,6 +19,9 @@
     <ItemGroup Label="SQLite">
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.14"/>
     </ItemGroup>
+    <ItemGroup Label="Docker">
+        <PackageVersion Include="Docker.DotNet" Version="3.125.15"/>
+    </ItemGroup>
     <ItemGroup Label="Testing">
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.5.2"/>
         <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2"/>

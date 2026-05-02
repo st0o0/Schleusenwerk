@@ -1,22 +1,30 @@
 using Akka.Actor;
 using Akka.Event;
+using Akka.Persistence;
+using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Persistence;
 
 namespace Schleusenwerk.Routing;
 
-public sealed class UpstreamEntityActor : ReceiveActor
+public sealed class UpstreamEntityActor : ReceivePersistentActor
 {
+    public override string PersistenceId => $"upstream-{Self.Path.Name}";
+
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly Func<UpstreamTarget, Props> _healthCheckPropsFactory;
+    private readonly IHealthCheckPropsFactory _healthCheckPropsFactory;
 
     private UpstreamTarget? _target;
     private IActorRef? _healthCheckActor;
 
-    public UpstreamEntityActor(Func<UpstreamTarget, Props> healthCheckPropsFactory)
+    public UpstreamEntityActor(IHealthCheckPropsFactory healthCheckPropsFactory)
     {
         _healthCheckPropsFactory = healthCheckPropsFactory;
 
-        Receive<RegisterUpstream>(HandleRegisterUpstream);
-        Receive<SelectUpstreamForDomain>(msg =>
+        Recover<UpstreamConfigured>(evt => _target = evt.Target);
+        Recover<SnapshotOffer>(_ => { });
+
+        Command<RegisterUpstream>(HandleRegisterUpstream);
+        Command<SelectUpstreamForDomain>(msg =>
         {
             if (_target is null)
             {
@@ -27,16 +35,32 @@ public sealed class UpstreamEntityActor : ReceiveActor
         });
     }
 
+    protected override void PreStart()
+    {
+        base.PreStart();
+        StartHealthCheck();
+    }
+
     private void HandleRegisterUpstream(RegisterUpstream msg)
     {
-        _target = msg.Target;
-
-        if (_healthCheckActor == null)
+        var evt = new UpstreamConfigured(msg.Target);
+        Persist(evt, persisted =>
         {
-            _healthCheckActor = Context.ActorOf(
-                _healthCheckPropsFactory(_target),
-                "health-check");
-            _healthCheckActor.Tell(msg);
+            _target = persisted.Target;
+            StartHealthCheck();
+            _log.Info("Upstream configured: {Url}", _target.Url);
+            Sender.Tell(ConfigurationCommandAck.Instance);
+        });
+    }
+
+    private void StartHealthCheck()
+    {
+        if (_healthCheckActor is not null || _target is null)
+        {
+            return;
         }
+        _healthCheckActor = Context.ActorOf(
+            _healthCheckPropsFactory.CreateProps(_target),
+            "health-check");
     }
 }

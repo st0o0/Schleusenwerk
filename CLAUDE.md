@@ -40,10 +40,19 @@ Discovery       (Schleusenwerk/Discovery/) — Docker socket watcher, label pars
 The `Servus.Akka` package is installed but several APIs do **not** compile and must not be used:
 - `ActorRef<T>` (typed actor ref) — unusable
 
-**Use instead:** `IActorRef` constructor parameter + `registry.Register<T>()` (standard Akka.Hosting pattern).
+**Use instead:** `Context.GetActor<T>()` for actor-to-actor lookups + `registry.Register<T>()` in setup.
+For non-actor services: `IRequiredActor<T>` or `IReadOnlyActorRegistry` via DI.
 
 ## Key Technology Decisions
 
+- **Actor Dependencies:** Actor-to-actor refs via `Context.GetActor<T>()` (Servus.Akka registry),
+  never constructor-injected `IActorRef`. Services (e.g. `IHealthCheckPropsFactory`) as DI singletons
+  resolved from `serviceProvider` in actor system setup or via `resolver.Props<T>()`.
+- **Actor State Machines:** Explicit `Become()` states with dedicated methods per state.
+  Actors proactively load their config at startup (Ask pattern) rather than waiting passively.
+  Use `IWithUnboundedStash` to buffer messages during initialization states.
+- **Actor Event Publishing:** Use EventHub stream publisher (`ISinkRef` via `Source.Queue`)
+  for publishing events, not direct `Tell` to EventHub.
 - **Persistence:** Akka.Persistence (event-sourced) — no Entity Framework, no direct DB access
 - **HTTP Client:** TurboHTTP NuGet package for upstream forwarding (not HttpClient)
 - **Load Balancing:** Akka.NET RoundRobinPool/RoundRobinGroup — no custom balancer

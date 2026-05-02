@@ -5,7 +5,7 @@ namespace Schleusenwerk.HealthCheck;
 /// <summary>
 /// Published to EventStream when an upstream's health status changes.
 /// </summary>
-public sealed record UpstreamHealthChanged(UpstreamUrl Url, bool IsHealthy) : IClusterEvent;
+public sealed record UpstreamHealthChanged(UpstreamUrl Url, bool IsHealthy) : IDomainEvent, IUpstreamEvent;
 
 /// <summary>
 /// Internal tick message that triggers a health check probe.

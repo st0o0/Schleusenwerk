@@ -20,12 +20,12 @@ public sealed record DomainRemoved(DomainName DomainName) : IClusterEvent;
 /// <summary>
 /// An upstream target was added to a domain.
 /// </summary>
-public sealed record UpstreamAdded(DomainName DomainName, UpstreamTarget Upstream);
+public sealed record UpstreamAdded(DomainName DomainName, UpstreamTarget Upstream) : IClusterEvent;
 
 /// <summary>
 /// An upstream target was removed from a domain.
 /// </summary>
-public sealed record UpstreamRemoved(DomainName DomainName, UpstreamUrl UpstreamUrl);
+public sealed record UpstreamRemoved(DomainName DomainName, UpstreamUrl UpstreamUrl) : IClusterEvent;
 
 /// <summary>
 /// Global proxy settings were updated.
@@ -36,4 +36,14 @@ public sealed record SettingsUpdated(ProxySettings Settings);
 /// Published when a new domain is added and needs a TLS certificate.
 /// Consumed by the CertificateRenewalActor to trigger ACME provisioning.
 /// </summary>
-public sealed record CertificateProvisioningRequested(DomainName DomainName) : IClusterEvent;
+public sealed record CertificateProvisioningRequested(DomainName DomainName) : ICertificateEvent;
+
+/// <summary>
+/// Persisted by ConfigurationPersistenceActor when a domain is registered in the index.
+/// </summary>
+public sealed record DomainRegistered(DomainName DomainName);
+
+/// <summary>
+/// Persisted by ConfigurationPersistenceActor when a domain is unregistered from the index.
+/// </summary>
+public sealed record DomainUnregistered(DomainName DomainName);

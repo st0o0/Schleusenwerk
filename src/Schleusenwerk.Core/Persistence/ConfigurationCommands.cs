@@ -53,11 +53,6 @@ public sealed record GetConfiguration
     public static GetConfiguration Instance { get; } = new();
 }
 
-/// <summary>
-/// Query to retrieve configuration for a single domain.
-/// Returns <see cref="DomainConfigResult"/> or <see cref="ConfigurationCommandNack"/> if not found.
-/// </summary>
-public sealed record GetDomainByName(DomainName DomainName);
 
 /// <summary>
 /// Result of a <see cref="GetDomainByName"/> query.
@@ -70,4 +65,37 @@ public sealed record DomainConfigResult(DomainConfig Config, IReadOnlyList<Upstr
 public sealed record GetSettings
 {
     public static GetSettings Instance { get; } = new();
+}
+
+/// <summary>
+/// Query to find an upstream target by its URL across all domains.
+/// Returns <see cref="UpstreamTargetResult"/> or <see cref="ConfigurationCommandNack"/> if not found.
+/// </summary>
+public sealed record GetUpstreamByUrl(UpstreamUrl Url);
+
+/// <summary>
+/// Result of a <see cref="GetUpstreamByUrl"/> query.
+/// </summary>
+public sealed record UpstreamTargetResult(UpstreamTarget Target);
+
+/// <summary>
+/// Query to retrieve all known domain names. Handled by ConfigurationPersistenceActor.
+/// </summary>
+public sealed record GetAllDomains
+{
+    public static GetAllDomains Instance { get; } = new();
+}
+
+/// <summary>
+/// Result of <see cref="GetAllDomains"/> query.
+/// </summary>
+public sealed record AllDomainsResult(IReadOnlyList<DomainName> Domains);
+
+/// <summary>
+/// Query to retrieve config for a domain entity. Handled by DomainEntityActor directly.
+/// Returns <see cref="DomainConfigResult"/> or <see cref="ConfigurationCommandNack"/>.
+/// </summary>
+public sealed record GetDomainConfig
+{
+    public static GetDomainConfig Instance { get; } = new();
 }

@@ -26,18 +26,26 @@ public readonly record struct DomainName
         var hostPart = isWildcard ? normalized[2..] : normalized;
 
         if (hostPart.Length == 0)
+        {
             throw new FormatException($"Invalid domain name: '{input}'.");
+        }
 
         if (hostPart.StartsWith('.') || hostPart.EndsWith('.'))
+        {
             throw new FormatException($"Invalid domain name: '{input}'.");
+        }
 
         foreach (var label in hostPart.Split('.'))
         {
-            if (label.Length == 0 || label.Length > 63)
+            if (label.Length is 0 or > 63)
+            {
                 throw new FormatException($"Invalid domain label in '{input}'.");
+            }
 
             if (!IsValidLabel(label))
+            {
                 throw new FormatException($"Invalid domain label '{label}' in '{input}'.");
+            }
         }
 
         return new DomainName(normalized, isWildcard);

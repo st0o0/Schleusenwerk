@@ -1,69 +1,111 @@
 using Akka.Actor;
 using Akka.Event;
+using Akka.Streams;
+using Akka.Streams.Dsl;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Servus.Akka;
 
 namespace Schleusenwerk.HealthCheck;
 
-/// <summary>
-/// Monitors a single upstream target by periodically probing its health endpoint.
-/// Tells <see cref="UpstreamHealthChanged"/> to the EventHubActor when the health
-/// status transitions between healthy and unhealthy based on configurable thresholds.
-/// </summary>
-public sealed class HealthCheckActor : ReceiveActor, IWithTimers
+public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnboundedStash
 {
     private const string TimerKey = "health-check-tick";
 
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly UpstreamUrl _upstreamUrl;
+    private readonly UpstreamTarget _target;
     private readonly HealthCheckConfig _config;
-    private readonly Func<UpstreamUrl, string, TimeSpan, CancellationToken, Task<bool>> _probeFunc;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IActorRef _eventHub;
+
+    private ISourceQueueWithComplete<IClusterEvent>? _publishQueue;
+    private IMaterializer _materializer = null!;
 
     private bool _isHealthy = true;
     private int _consecutiveFailures;
     private int _consecutiveSuccesses;
 
     public ITimerScheduler Timers { get; set; } = null!;
+    public IStash Stash { get; set; } = null!;
 
-    public HealthCheckActor(
-        UpstreamUrl upstreamUrl,
-        HealthCheckConfig config,
-        Func<UpstreamUrl, string, TimeSpan, CancellationToken, Task<bool>> probeFunc)
+    public HealthCheckActor(UpstreamTarget target, IHttpClientFactory httpClientFactory)
     {
-        _upstreamUrl = upstreamUrl;
-        _config = config;
-        _probeFunc = probeFunc;
+        _target = target;
+        _config = target.HealthCheck;
+        _httpClientFactory = httpClientFactory;
         _eventHub = Context.GetActor<EventHub>();
 
-        Receive<CheckHealth>(_ => OnCheckHealth());
-        Receive<GetHealthStatus>(_ => OnGetHealthStatus());
+        WaitingForPublisher();
     }
 
     protected override void PreStart()
     {
-        Timers.StartPeriodicTimer(TimerKey, CheckHealth.Instance, _config.Interval, _config.Interval);
+        _materializer = Context.System.Materializer();
+        _eventHub.Ask<EventHub.PublisherReady>(EventHub.GetPublisher.Instance)
+            .PipeTo(Self);
+    }
+
+    private void WaitingForPublisher()
+    {
+        Receive<EventHub.PublisherReady>(msg =>
+        {
+            var sink = msg.SinkRef.Sink;
+            _publishQueue = Source.Queue<IClusterEvent>(100, OverflowStrategy.DropHead)
+                .To(sink)
+                .Run(_materializer);
+
+            Timers.StartPeriodicTimer(TimerKey, CheckHealth.Instance, _config.Interval, _config.Interval);
+
+            _log.Info("HealthCheck publisher ready for {Url}", _target.Url);
+            Stash.UnstashAll();
+            Become(Idle);
+        });
+        Receive<Status.Failure>(f =>
+        {
+            _log.Warning(f.Cause, "Failed to get publisher from EventHub — retrying");
+            _eventHub.Ask<EventHub.PublisherReady>(EventHub.GetPublisher.Instance)
+                .PipeTo(Self);
+        });
+        ReceiveAny(_ => Stash.Stash());
+    }
+
+    private void Idle()
+    {
+        Receive<CheckHealth>(_ => OnCheckHealth());
+        Receive<GetHealthStatus>(_ => OnGetHealthStatus());
+    }
+
+    private void Probing()
+    {
+        Receive<bool>(HandleProbeResult);
+        Receive<CheckHealth>(_ => { });
+        Receive<GetHealthStatus>(_ => OnGetHealthStatus());
     }
 
     private void OnCheckHealth()
     {
         var self = Self;
+        var url = _target.Url;
         var endpoint = _config.HealthEndpoint;
         var timeout = _config.Timeout;
 
-        // Fire-and-forget with PipeTo so result is processed on actor thread
-        _probeFunc(_upstreamUrl, endpoint, timeout, CancellationToken.None)
-            .ContinueWith(task => task is { IsCompletedSuccessfully: true, Result: true })
-            .PipeTo(self);
-
-        // Handle the piped boolean result
-        Become(() =>
+        Task.Run(async () =>
         {
-            Receive<bool>(HandleProbeResult);
-            Receive<CheckHealth>(_ => { }); // Ignore ticks while waiting for probe result
-            Receive<GetHealthStatus>(_ => OnGetHealthStatus());
-        });
+            using var client = _httpClientFactory.CreateClient("health-check");
+            client.Timeout = timeout;
+            try
+            {
+                var uri = new Uri($"{url}{endpoint.TrimStart('/')}");
+                using var response = await client.GetAsync(uri);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }).PipeTo(self);
+
+        Become(Probing);
     }
 
     private void HandleProbeResult(bool success)
@@ -77,8 +119,8 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers
             {
                 _isHealthy = true;
                 _log.Info("Upstream {Url} is now healthy after {Count} consecutive successes",
-                    _upstreamUrl, _consecutiveSuccesses);
-                _eventHub.Tell(new UpstreamHealthChanged(_upstreamUrl, IsHealthy: true));
+                    _target.Url, _consecutiveSuccesses);
+                PublishEvent(new UpstreamHealthChanged(_target.Url, IsHealthy: true));
             }
         }
         else
@@ -90,21 +132,28 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers
             {
                 _isHealthy = false;
                 _log.Warning("Upstream {Url} is now unhealthy after {Count} consecutive failures",
-                    _upstreamUrl, _consecutiveFailures);
-                _eventHub.Tell(new UpstreamHealthChanged(_upstreamUrl, IsHealthy: false));
+                    _target.Url, _consecutiveFailures);
+                PublishEvent(new UpstreamHealthChanged(_target.Url, IsHealthy: false));
             }
         }
 
-        // Restore normal receive behavior
-        Become(() =>
-        {
-            Receive<CheckHealth>(_ => OnCheckHealth());
-            Receive<GetHealthStatus>(_ => OnGetHealthStatus());
-        });
+        Become(Idle);
     }
 
     private void OnGetHealthStatus()
     {
-        Sender.Tell(new HealthStatus(_upstreamUrl, _isHealthy, _consecutiveFailures, _consecutiveSuccesses));
+        Sender.Tell(new HealthStatus(_target.Url, _isHealthy, _consecutiveFailures, _consecutiveSuccesses));
     }
+
+    private void PublishEvent(IClusterEvent evt)
+    {
+        _publishQueue?.OfferAsync(evt).PipeTo(Self,
+            success: r => r is QueueOfferResult.Dropped
+                ? new PublishDropped(evt)
+                : Akka.Done.Instance,
+            failure: ex => new PublishFailed(ex));
+    }
+
+    private sealed record PublishDropped(IClusterEvent Event);
+    private sealed record PublishFailed(Exception Exception);
 }

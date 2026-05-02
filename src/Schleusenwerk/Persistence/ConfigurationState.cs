@@ -28,6 +28,19 @@ public sealed class ConfigurationState
             && targets.Any(t => t.Url.Equals(url));
     }
 
+    public UpstreamTarget? FindUpstreamByUrl(UpstreamUrl url)
+    {
+        foreach (var targets in _upstreams.Values)
+        {
+            var match = targets.FirstOrDefault(t => t.Url.Equals(url));
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+        return null;
+    }
+
     public void Apply(DomainAdded evt)
     {
         _domains[evt.Config.DomainName] = evt.Config;

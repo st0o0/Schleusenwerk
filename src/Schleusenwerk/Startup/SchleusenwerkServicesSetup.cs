@@ -1,9 +1,8 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Schleusenwerk.Forwarding;
+using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Servus.Core.Application.Startup;
 using TurboHTTP;
@@ -15,11 +14,14 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
     public void SetupServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpClient();
+        services.AddSingleton<IHealthCheckPropsFactory, HealthCheckPropsFactory>();
         services.AddTurboHttpClient();
         services.AddSingleton<RequestForwardingPipeline>();
         services.AddSingleton<HeaderManipulationFilter>();
         services.AddSingleton<WebSocketTunnel>();
         services.AddSingleton<IProxyDispatcher, ProxyDispatcher>();
+        var connectionString = configuration["Akka:Persistence:ConnectionString"] ?? "Data Source=/data/schleusenwerk.db";
+        services.AddSingleton<IConfigurationStore>(new SqliteConfigurationStore(connectionString));
         services.AddSingleton<IConfigurationService, ConfigurationService>();
 
         services.Configure<KestrelServerOptions>(options =>

@@ -11,19 +11,18 @@ namespace Schleusenwerk.Forwarding;
 /// </summary>
 internal sealed class RequestForwardingPipeline
 {
-    private readonly ITurboHttpClientFactory _clientFactory;
+    private readonly ITurboHttpClient _sharedClient;
 
     public RequestForwardingPipeline(ITurboHttpClientFactory clientFactory)
     {
-        _clientFactory = clientFactory;
+        _sharedClient = clientFactory.CreateClient(string.Empty);
     }
 
     public async Task ForwardAsync(HttpContext context, UpstreamTarget upstream, DomainConfig config, HeaderManipulationFilter? headerFilter = null)
     {
         var cancellationToken = context.RequestAborted;
 
-        using var client = _clientFactory.CreateClient(string.Empty);
-        client.Timeout = config.RequestTimeout;
+        _sharedClient.Timeout = config.RequestTimeout;
 
         var upstreamUri = BuildUpstreamUri(context.Request, upstream.Url);
         using var requestMessage = CreateRequestMessage(context.Request, upstreamUri);
@@ -45,7 +44,7 @@ internal sealed class RequestForwardingPipeline
         HttpResponseMessage upstreamResponse;
         try
         {
-            upstreamResponse = await client.SendAsync(requestMessage, cancellationToken);
+            upstreamResponse = await _sharedClient.SendAsync(requestMessage, cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -79,7 +78,7 @@ internal sealed class RequestForwardingPipeline
         }
     }
 
-    internal static Uri BuildUpstreamUri(HttpRequest request, UpstreamUrl upstream)
+    private static Uri BuildUpstreamUri(HttpRequest request, UpstreamUrl upstream)
     {
         var builder = new UriBuilder(upstream.Value)
         {
@@ -89,7 +88,7 @@ internal sealed class RequestForwardingPipeline
         return builder.Uri;
     }
 
-    internal static HttpRequestMessage CreateRequestMessage(HttpRequest request, Uri upstreamUri)
+    private static HttpRequestMessage CreateRequestMessage(HttpRequest request, Uri upstreamUri)
     {
         return new HttpRequestMessage
         {
@@ -99,7 +98,7 @@ internal sealed class RequestForwardingPipeline
         };
     }
 
-    internal static void CopyRequestHeaders(HttpRequest source, HttpRequestMessage target)
+    private static void CopyRequestHeaders(HttpRequest source, HttpRequestMessage target)
     {
         foreach (var header in source.Headers)
         {
@@ -114,7 +113,7 @@ internal sealed class RequestForwardingPipeline
         }
     }
 
-    internal static void SetProxyHeaders(HttpContext context, HttpRequestMessage requestMessage)
+    private static void SetProxyHeaders(HttpContext context, HttpRequestMessage requestMessage)
     {
         var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var scheme = context.Request.Scheme;
@@ -137,7 +136,7 @@ internal sealed class RequestForwardingPipeline
         requestMessage.Headers.TryAddWithoutValidation(HeaderNames.XForwardedHost, host);
     }
 
-    internal static void RemoveHopByHopHeaders(System.Net.Http.Headers.HttpRequestHeaders headers)
+    private static void RemoveHopByHopHeaders(System.Net.Http.Headers.HttpRequestHeaders headers)
     {
         foreach (var name in HopByHopHeaders)
         {

@@ -24,6 +24,7 @@ public sealed class EventHub : ReceiveActor
     {
         Receive<IClusterEvent>(Handle);
         Receive<GetPublisher>(Handle);
+        Receive<FilteredSubscribe>(HandleFiltered);
         Receive<Subscribe>(Handle);
         Receive<IQueueOfferResult>(r =>
         {
@@ -70,6 +71,15 @@ public sealed class EventHub : ReceiveActor
             .PipeTo(Sender, Self, sourceRef => new Subscribed(sourceRef));
     }
 
+    private void HandleFiltered(FilteredSubscribe msg)
+    {
+        _broadcastSource
+            .Where(evt => msg.FilterType.IsInstanceOfType(evt))
+            .ToMaterialized(StreamRefs.SourceRef<IClusterEvent>(), Keep.Right)
+            .Run(_materializer)
+            .PipeTo(Sender, Self, sourceRef => new Subscribed(sourceRef));
+    }
+
     public sealed record GetPublisher
     {
         public static readonly GetPublisher Instance = new();
@@ -78,6 +88,14 @@ public sealed class EventHub : ReceiveActor
     public sealed record Subscribe
     {
         public static readonly Subscribe Instance = new();
+    }
+
+    public abstract record FilteredSubscribe(Type FilterType);
+
+    public sealed record Subscribe<T> : FilteredSubscribe where T : IClusterEvent
+    {
+        public static readonly Subscribe<T> Instance = new();
+        public Subscribe() : base(typeof(T)) { }
     }
 
     public sealed record PublisherReady(ISinkRef<IClusterEvent> SinkRef);

@@ -5,14 +5,11 @@ using Akka.Hosting;
 using Akka.Persistence.Sql.Hosting;
 using Akka.Remote.Hosting;
 using LinqToDB;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Schleusenwerk.Discovery;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Servus.Akka.Startup;
-using Akka.Util;
 
 namespace Schleusenwerk.Startup;
 
@@ -36,64 +33,37 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             SeedNodes = [$"akka.tcp://schleusenwerk@{hostname}:{port}"]
         });
 
-        var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var healthCheckPropsFactory = serviceProvider.GetRequiredService<IHealthCheckPropsFactory>();
+        var messageExtractor = HashCodeMessageExtractor.Create(
+            maxNumberOfShards: 20,
+            entityIdExtractor: msg => (msg as IWithEntityId)?.EntityId);
 
-        Func<UpstreamTarget, Props> healthCheckPropsFactory = upstream =>
-        {
-            var config = new HealthCheckConfig();
-            Func<UpstreamUrl, string, TimeSpan, CancellationToken, Task<bool>> probeFunc =
-                async (url, endpoint, timeout, ct) =>
-                {
-                    using var client = httpClientFactory.CreateClient("health-check");
-                    client.Timeout = timeout;
-                    try
-                    {
-                        var uri = new Uri($"{url}{endpoint.TrimStart('/')}");
-                        using var response = await client.GetAsync(uri, ct);
-                        return response.IsSuccessStatusCode;
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-                };
-
-            return Props.Create(() => new HealthCheckActor(upstream.Url, config, probeFunc));
-        };
-
-        // Register upstream region first — DomainEntityActor props factory reads it from registry
         builder.WithShardRegion<UpstreamEntityActor>(
             "upstream-pool",
             entityId => Props.Create(() => new UpstreamEntityActor(healthCheckPropsFactory)),
-            msg => msg is IWithUrl m
-                ? Option<(string, object)>.Create((m.Url, msg))
-                : Option<(string, object)>.None,
-            msg => msg is IWithUrl m
-                ? Math.Abs(m.Url.GetHashCode() % 20).ToString()
-                : null!,
-            new ShardOptions { PassivateIdleEntityAfter = TimeSpan.FromMinutes(5) });
+            messageExtractor,
+            new ShardOptions
+            {
+                PassivateIdleEntityAfter = TimeSpan.FromMinutes(5),
+                RememberEntities = true
+            });
 
-        // Register domain region using WithActors to get access to the registry after upstream is registered
+        var configStore = serviceProvider.GetRequiredService<IConfigurationStore>();
+
+        builder.WithShardRegion<DomainEntityActor>(
+            "domain-router",
+            entityId => Props.Create(() => new DomainEntityActor(configStore)),
+            messageExtractor,
+            new ShardOptions
+            {
+                PassivateIdleEntityAfter = TimeSpan.FromMinutes(5),
+                RememberEntities = true
+            });
+
         builder.WithActors((system, registry, resolver) =>
         {
-            var domainShardRegion = ClusterSharding.Get(system).Start(
-                typeName: "domain-router",
-                entityProps: Props.Create(() => new DomainEntityActor(registry.Get<UpstreamEntityActor>())),
-                settings: ClusterShardingSettings.Create(system),
-                extractEntityId: (object msg) => msg is IWithDomain m
-                    ? (m.Domain, msg)
-                    : default,
-                extractShardId: (object msg) => msg is IWithDomain m
-                    ? Math.Abs(m.Domain.GetHashCode() % 20).ToString()
-                    : null!);
-
-            registry.Register<DomainEntityActor>(domainShardRegion);
-
             var eventHub = system.ActorOf(resolver.Props<EventHub>(), "eventHub");
             registry.Register<EventHub>(eventHub);
-
-            var config = system.ActorOf(resolver.Props<ConfigurationPersistenceActor>(), "configuration");
-            registry.Register<ConfigurationPersistenceActor>(config);
 
             var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
             registry.Register<DockerDiscoveryActor>(dockerDiscovery);

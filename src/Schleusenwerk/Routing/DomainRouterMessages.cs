@@ -1,13 +1,20 @@
 namespace Schleusenwerk.Routing;
 
-public interface IWithDomain
+public interface IWithEntityId
 {
-    string Domain { get; }
+    string EntityId { get; }
 }
 
-public interface IWithUrl
+public interface IWithDomain : IWithEntityId
+{
+    string Domain { get; }
+    string IWithEntityId.EntityId => Domain;
+}
+
+public interface IWithUrl : IWithEntityId
 {
     string Url { get; }
+    string IWithEntityId.EntityId => Url;
 }
 
 /// <summary>
@@ -43,6 +50,16 @@ public sealed record ResolveUpstream(string Host) : IWithDomain
 /// Removes a domain from the routing table.
 /// </summary>
 public sealed record RemoveDomain(DomainName DomainName) : IWithDomain
+{
+    public string Domain => DomainName.Value;
+}
+
+/// <summary>
+/// Query to retrieve configuration for a single domain.
+/// Returns <see cref="DomainConfigResult"/> or <see cref="ConfigurationCommandNack"/> if not found.
+/// Routed to DomainEntityActor shard region via IWithDomain.
+/// </summary>
+public sealed record GetDomainByName(DomainName DomainName) : IWithDomain
 {
     public string Domain => DomainName.Value;
 }

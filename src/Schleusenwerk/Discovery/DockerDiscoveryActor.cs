@@ -2,36 +2,33 @@ using Akka.Actor;
 using Akka.Event;
 using Docker.DotNet;
 using Docker.DotNet.Models;
-using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Servus.Akka;
 using System.Runtime.InteropServices;
-using PersistenceRemoveDomain = Schleusenwerk.Persistence.RemoveDomain;
 
 namespace Schleusenwerk.Discovery;
 
 /// <summary>
 /// Singleton actor that discovers Docker containers with schleusenwerk.* labels
-/// and registers/deregisters their routes with ConfigurationPersistenceActor.
+/// and registers/deregisters their routes via the DomainEntityActor shard region.
 /// Retries with exponential backoff if the Docker socket is unavailable.
 /// </summary>
 public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
 {
-    private static readonly TimeSpan AskTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
 
     public ITimerScheduler Timers { get; set; } = null!;
 
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly IActorRef _configActor;
+    private readonly IActorRef _domainRegion;
 
-    private IDockerClient? _client;
+    private DockerClient? _client;
     private CancellationTokenSource? _monitorCts;
     private readonly Dictionary<string, (DomainName Domain, UpstreamUrl Url)> _tracked = new();
 
     public DockerDiscoveryActor()
     {
-        _configActor = Context.GetActor<ConfigurationPersistenceActor>();
+        _domainRegion = Context.GetActor<DomainEntityActor>();
 
         Receive<Connect>(Handle);
         Receive<StartDiscovery>(Handle);
@@ -42,8 +39,6 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         Receive<InspectFailed>(msg =>
             _log.Warning("Failed to inspect container {Id}: {Error}", msg.ContainerId[..12], msg.Error.Message));
         Receive<MonitoringEnded>(Handle);
-        Receive<CheckDomainUpstreams>(Handle);
-        Receive<DomainCheckResult>(Handle);
         Receive<Noop>(_ => { });
     }
 
@@ -146,11 +141,9 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
     {
         _client!.Containers
             .ListContainersAsync(new ContainersListParameters { All = false })
-            .ContinueWith<object>(t =>
-                t.IsCompletedSuccessfully
-                    ? new ScanResult(t.Result)
-                    : new ScanFailed(t.Exception!))
-            .PipeTo(Self);
+            .PipeTo(Self,
+                success: result => new ScanResult(result),
+                failure: ex => new ScanFailed(ex));
     }
 
     private void Handle(ContainerEvent msg)
@@ -159,11 +152,9 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         {
             case "start":
                 _client!.Containers.InspectContainerAsync(msg.ContainerId)
-                    .ContinueWith<object>(t =>
-                        t.IsCompletedSuccessfully
-                            ? new ContainerInspected(t.Result)
-                            : new InspectFailed(msg.ContainerId, t.Exception!))
-                    .PipeTo(Self);
+                    .PipeTo(Self,
+                        success: result => new ContainerInspected(result),
+                        failure: ex => new InspectFailed(msg.ContainerId, ex));
                 break;
 
             case "stop":
@@ -190,33 +181,6 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         }
     }
 
-    private void Handle(CheckDomainUpstreams msg)
-    {
-        _configActor.Ask<object>(new GetDomainByName(msg.Domain), AskTimeout)
-            .ContinueWith<object>(t =>
-            {
-                if (!t.IsCompletedSuccessfully)
-                    return Noop.Instance;
-
-                if (t.Result is DomainConfigResult result)
-                    return new DomainCheckResult(msg.Domain, result);
-
-                return Noop.Instance;
-            })
-            .PipeTo(Self);
-    }
-
-    private void Handle(DomainCheckResult msg)
-    {
-        if (msg.Config.Upstreams.Count == 0)
-        {
-            _configActor.Ask<object>(new PersistenceRemoveDomain(msg.Domain), AskTimeout)
-                .ContinueWith(_ => Noop.Instance)
-                .PipeTo(Self);
-
-            _log.Info("Domain removed (no upstreams remain): {Domain}", msg.Domain);
-        }
-    }
 
     private void Handle(ScanResult msg)
     {
@@ -255,28 +219,21 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
             ForceHttps = true,
         };
 
-        // AddDomain + AddUpstream are idempotent: nack "already exists" is acceptable.
-        _configActor.Tell(new AddDomain(domainConfig));
-        _configActor.Tell(new AddUpstream(parsed.Domain, parsed.Upstream));
+        // Send SetRoute to the DomainEntityActor shard region
+        _domainRegion.Tell(new SetRoute(domainConfig, [parsed.Upstream]));
 
         _log.Info("Registered container {Id} → {Domain} @ {Url}", containerId[..12], parsed.Domain, parsed.Upstream.Url);
     }
 
     private void UnregisterContainer(string containerId)
     {
-        if (!_tracked.TryGetValue(containerId, out var entry))
+        if (!_tracked.Remove(containerId, out var entry))
         {
             return;
         }
 
-        _tracked.Remove(containerId);
-
-        _configActor.Ask<object>(new RemoveUpstream(entry.Domain, entry.Url), AskTimeout)
-            .ContinueWith<object>(t =>
-                t is { IsCompletedSuccessfully: true, Result: ConfigurationCommandAck }
-                    ? new CheckDomainUpstreams(entry.Domain)
-                    : Noop.Instance)
-            .PipeTo(Self);
+        // Send RemoveDomain to the DomainEntityActor shard region
+        _domainRegion.Tell(new RemoveDomain(entry.Domain));
 
         _log.Info("Unregistered container {Id} upstream {Url}", containerId[..12], entry.Url);
     }
@@ -297,11 +254,11 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         });
 
         _client!.System.MonitorEventsAsync(new ContainerEventsParameters(), progress, token)
-            .ContinueWith<object>(t =>
-                !t.IsCanceled
-                    ? new MonitoringEnded(t.Exception?.InnerException ?? t.Exception)
-                    : Noop.Instance)
-            .PipeTo(Self);
+            .PipeTo(Self,
+                success: () => new MonitoringEnded(null),
+                failure: ex => ex is OperationCanceledException
+                    ? Noop.Instance
+                    : new MonitoringEnded(ex));
     }
 
     private void ScheduleReconnect(int attempt)
@@ -338,8 +295,6 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
     private sealed record MonitoringEnded(Exception? Error);
     private sealed record ScanResult(IList<ContainerListResponse> Containers);
     private sealed record ScanFailed(Exception Error);
-    private sealed record CheckDomainUpstreams(DomainName Domain);
-    private sealed record DomainCheckResult(DomainName Domain, DomainConfigResult Config);
     private sealed record Noop
     {
         public static Noop Instance { get; } = new();

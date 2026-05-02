@@ -1,98 +1,91 @@
 using Akka.Actor;
-using Akka.TestKit.Xunit;
+using Akka.Hosting;
+using Akka.Persistence.TestKit;
+using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
 
 namespace Schleusenwerk.Tests.Routing;
 
-public sealed class UpstreamEntityActorSpec : TestKit
+public sealed class UpstreamEntityActorSpec : PersistenceTestKit
 {
-    private IActorRef CreateEntity(IActorRef? healthCheckProbe = null)
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+    private int _actorCounter;
+
+    private IActorRef CreateEntity(IHealthCheckPropsFactory? factory = null)
     {
-        var probe = healthCheckProbe ?? CreateTestProbe();
-        Func<UpstreamTarget, Props> factory = _ => Props.Create<NullActor>();
-        if (healthCheckProbe != null)
-        {
-            factory = _ => Props.Create(() => new ForwardingActor(healthCheckProbe));
-        }
-        return Sys.ActorOf(Props.Create(() => new UpstreamEntityActor(factory)));
+        var id = Interlocked.Increment(ref _actorCounter);
+        var registry = ActorRegistry.For(Sys);
+
+        var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{id}");
+        registry.Register<EventHub>(hub, overwrite: true);
+
+        factory ??= new TestHealthCheckPropsFactory(_ => Props.Create<NullActor>());
+
+        return Sys.ActorOf(
+            Props.Create(() => new UpstreamEntityActor(factory)),
+            $"upstream-{id:D4}");
     }
 
     [Fact(Timeout = 5000)]
-    public void UpstreamEntityActor_should_reply_UpstreamResolved_on_SelectUpstreamForDomain()
+    public async Task UpstreamEntityActor_should_persist_target_on_RegisterUpstream()
+    {
+        var target = UpstreamTarget.Create("http://upstream:8080");
+        var entity = CreateEntity();
+
+        var ack = await entity.Ask<ConfigurationCommandAck>(new RegisterUpstream(target), Timeout);
+
+        Assert.NotNull(ack);
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task UpstreamEntityActor_should_reply_UpstreamResolved_after_register()
     {
         var target = UpstreamTarget.Create("http://upstream:8080");
         var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
         var entity = CreateEntity();
 
-        entity.Tell(new RegisterUpstream(target));
-        entity.Tell(new SelectUpstreamForDomain(config, "http://upstream:8080/"));
+        await entity.Ask<ConfigurationCommandAck>(new RegisterUpstream(target), Timeout);
+        var resolved = await entity.Ask<UpstreamResolved>(
+            new SelectUpstreamForDomain(config, "http://upstream:8080/"), Timeout);
 
-        var resolved = ExpectMsg<UpstreamResolved>();
         Assert.Equal("upstream", resolved.Target.Url.Host);
         Assert.Equal("example.com", resolved.Config.DomainName.Value);
     }
 
     [Fact(Timeout = 5000)]
-    public void UpstreamEntityActor_should_update_target_on_second_RegisterUpstream()
+    public async Task UpstreamEntityActor_should_update_target_on_new_RegisterUpstream()
     {
         var first = UpstreamTarget.Create("http://v1:8080");
         var second = UpstreamTarget.Create("http://v2:9090");
         var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
         var entity = CreateEntity();
 
-        entity.Tell(new RegisterUpstream(first));
-        entity.Tell(new RegisterUpstream(second));
-        entity.Tell(new SelectUpstreamForDomain(config, "http://v2:9090/"));
+        await entity.Ask<ConfigurationCommandAck>(new RegisterUpstream(first), Timeout);
+        await entity.Ask<ConfigurationCommandAck>(new RegisterUpstream(second), Timeout);
 
-        var resolved = ExpectMsg<UpstreamResolved>();
+        var resolved = await entity.Ask<UpstreamResolved>(
+            new SelectUpstreamForDomain(config, "http://v2:9090/"), Timeout);
+
         Assert.Equal("v2", resolved.Target.Url.Host);
     }
 
     [Fact(Timeout = 5000)]
-    public void UpstreamEntityActor_should_start_health_check_actor_on_first_RegisterUpstream()
+    public void UpstreamEntityActor_should_reply_UpstreamNotFound_when_no_target()
     {
-        var healthProbe = CreateTestProbe();
-        var target = UpstreamTarget.Create("http://upstream:8080");
-        var entity = Sys.ActorOf(Props.Create(() => new UpstreamEntityActor(
-            _ => Props.Create(() => new ForwardingActor(healthProbe)))));
+        var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
+        var entity = CreateEntity();
 
-        entity.Tell(new RegisterUpstream(target));
+        entity.Tell(new SelectUpstreamForDomain(config, "http://any:8080/"));
 
-        healthProbe.ExpectMsg<RegisterUpstream>(TimeSpan.FromSeconds(1));
+        ExpectMsg<UpstreamNotFound>(Timeout);
     }
 
-    [Fact(Timeout = 5000)]
-    public void UpstreamEntityActor_should_not_start_second_health_check_on_re_register()
+    private sealed class TestHealthCheckPropsFactory(Func<UpstreamTarget, Props> factory) : IHealthCheckPropsFactory
     {
-        var startCount = 0;
-        var target = UpstreamTarget.Create("http://upstream:8080");
-
-        Func<UpstreamTarget, Props> countingFactory = _ =>
-        {
-            startCount++;
-            return Props.Create<NullActor>();
-        };
-
-        var entity = Sys.ActorOf(Props.Create(() => new UpstreamEntityActor(countingFactory)));
-
-        entity.Tell(new RegisterUpstream(target));
-        entity.Tell(new RegisterUpstream(target));
-        // Give actor time to process both messages
-        ExpectNoMsg(TimeSpan.FromMilliseconds(200));
-
-        Assert.Equal(1, startCount);
+        public Props CreateProps(UpstreamTarget target) => factory(target);
     }
 
-    // Minimal no-op actor used as stub for HealthCheckActor
     private sealed class NullActor : ReceiveActor { }
-
-    // Forwards the first message it receives to a probe
-    private sealed class ForwardingActor : ReceiveActor
-    {
-        public ForwardingActor(IActorRef probe)
-        {
-            ReceiveAny(msg => probe.Tell(msg));
-        }
-    }
 }

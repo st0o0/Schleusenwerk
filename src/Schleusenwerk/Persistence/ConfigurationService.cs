@@ -4,33 +4,39 @@ using Schleusenwerk.Routing;
 
 namespace Schleusenwerk.Persistence;
 
-/// <summary>
-/// Service layer that routes configuration queries and commands to the
-/// <see cref="ConfigurationPersistenceActor"/> via the Ask pattern.
-/// Returns Result types for error handling without exceptions.
-/// </summary>
 public sealed class ConfigurationService : IConfigurationService
 {
-    private readonly IActorRef _configActor;
+    private readonly IActorRef _domainRegion;
+    private readonly IConfigurationStore _store;
     private readonly TimeSpan _timeout;
 
-    public ConfigurationService(IReadOnlyActorRegistry registry, TimeSpan? timeout = null)
+    public ConfigurationService(IReadOnlyActorRegistry registry, IConfigurationStore store, TimeSpan? timeout = null)
     {
-        _configActor = registry.Get<ConfigurationPersistenceActor>();
+        _domainRegion = registry.Get<DomainEntityActor>();
+        _store = store;
         _timeout = timeout ?? TimeSpan.FromSeconds(5);
     }
 
     public async Task<ConfigurationResult<ConfigurationSnapshot>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _configActor.Ask<ConfigurationSnapshot>(
-            GetConfiguration.Instance, _timeout, cancellationToken);
-        return new ConfigurationResult<ConfigurationSnapshot>.Success(result);
+        var domains = await _store.GetAllDomainsAsync(cancellationToken);
+        var settings = await _store.GetSettingsAsync(cancellationToken);
+
+        var snapshot = new ConfigurationSnapshot
+        {
+            Domains = domains.ToList(),
+            Upstreams = new Dictionary<string, IReadOnlyList<UpstreamTarget>>(),
+            Certificates = new Dictionary<string, CertificateInfo>(),
+            Settings = settings,
+        };
+
+        return new ConfigurationResult<ConfigurationSnapshot>.Success(snapshot);
     }
 
     public async Task<ConfigurationResult<DomainConfigResult>> GetByDomainAsync(
         DomainName domainName, CancellationToken cancellationToken = default)
     {
-        var result = await _configActor.Ask<object>(
+        var result = await _domainRegion.Ask<object>(
             new GetDomainByName(domainName), _timeout, cancellationToken);
 
         return result switch
@@ -43,42 +49,122 @@ public sealed class ConfigurationService : IConfigurationService
 
     public async Task<ConfigurationResult> AddDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new AddDomain(config), cancellationToken);
+        var result = await _domainRegion.Ask<object>(
+            new SetRoute(config, []), _timeout, cancellationToken);
+
+        return result switch
+        {
+            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
+            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
+            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
+        };
     }
 
     public async Task<ConfigurationResult> UpdateDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new UpdateDomain(config), cancellationToken);
+        var queryResult = await _domainRegion.Ask<object>(
+            new GetDomainByName(config.DomainName), _timeout, cancellationToken);
+
+        var upstreams = queryResult switch
+        {
+            DomainConfigResult domainResult => domainResult.Upstreams.ToList(),
+            _ => new List<UpstreamTarget>(),
+        };
+
+        var result = await _domainRegion.Ask<object>(
+            new SetRoute(config, upstreams), _timeout, cancellationToken);
+
+        return result switch
+        {
+            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
+            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
+            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
+        };
     }
 
     public async Task<ConfigurationResult> RemoveDomainAsync(DomainName domainName, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new RemoveDomain(domainName), cancellationToken);
+        var result = await _domainRegion.Ask<object>(
+            new RemoveDomain(domainName), _timeout, cancellationToken);
+
+        return result switch
+        {
+            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
+            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
+            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
+        };
     }
 
     public async Task<ConfigurationResult> AddUpstreamAsync(
         DomainName domainName, UpstreamTarget upstream, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new AddUpstream(domainName, upstream), cancellationToken);
+        var queryResult = await _domainRegion.Ask<object>(
+            new GetDomainByName(domainName), _timeout, cancellationToken);
+
+        if (queryResult is not DomainConfigResult domainResult)
+        {
+            return new ConfigurationResult.Failure("Domain not found or query failed.");
+        }
+
+        if (domainResult.Upstreams.Any(u => u.Url.Equals(upstream.Url)))
+        {
+            return new ConfigurationResult.Failure($"Upstream '{upstream.Url}' already exists.");
+        }
+
+        var upstreams = domainResult.Upstreams.Append(upstream).ToList();
+        var result = await _domainRegion.Ask<object>(
+            new SetRoute(domainResult.Config, upstreams), _timeout, cancellationToken);
+
+        return result switch
+        {
+            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
+            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
+            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
+        };
     }
 
     public async Task<ConfigurationResult> RemoveUpstreamAsync(
         DomainName domainName, UpstreamUrl upstreamUrl, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new RemoveUpstream(domainName, upstreamUrl), cancellationToken);
+        var queryResult = await _domainRegion.Ask<object>(
+            new GetDomainByName(domainName), _timeout, cancellationToken);
+
+        if (queryResult is not DomainConfigResult domainResult)
+        {
+            return new ConfigurationResult.Failure("Domain not found or query failed.");
+        }
+
+        if (!domainResult.Upstreams.Any(u => u.Url.Equals(upstreamUrl)))
+        {
+            return new ConfigurationResult.Failure($"Upstream '{upstreamUrl}' does not exist.");
+        }
+
+        var upstreams = domainResult.Upstreams
+            .Where(u => !u.Url.Equals(upstreamUrl))
+            .ToList();
+
+        var result = await _domainRegion.Ask<object>(
+            new SetRoute(domainResult.Config, upstreams), _timeout, cancellationToken);
+
+        return result switch
+        {
+            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
+            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
+            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
+        };
     }
 
     public async Task<ConfigurationResult<ProxySettings>> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _configActor.Ask<ProxySettings>(
-            GetSettings.Instance, _timeout, cancellationToken);
-        return new ConfigurationResult<ProxySettings>.Success(result);
+        var settings = await _store.GetSettingsAsync(cancellationToken);
+        return new ConfigurationResult<ProxySettings>.Success(settings);
     }
 
     public async Task<ConfigurationResult> UpdateSettingsAsync(
         ProxySettings settings, CancellationToken cancellationToken = default)
     {
-        return await SendCommandAsync(new UpdateSettings(settings), cancellationToken);
+        await _store.UpdateSettingsAsync(settings, cancellationToken);
+        return ConfigurationResult.Success.Instance;
     }
 
     public async Task<ConfigurationResult<string>> ExportAsync(
@@ -94,17 +180,5 @@ public sealed class ConfigurationService : IConfigurationService
         var snapshot = ((ConfigurationResult<ConfigurationSnapshot>.Success)snapshotResult).Value;
         var json = ConfigurationExporter.ToJson(snapshot, options);
         return new ConfigurationResult<string>.Success(json);
-    }
-
-    private async Task<ConfigurationResult> SendCommandAsync(object command, CancellationToken cancellationToken)
-    {
-        var result = await _configActor.Ask<object>(command, _timeout, cancellationToken);
-
-        return result switch
-        {
-            ConfigurationCommandAck => ConfigurationResult.Success.Instance,
-            ConfigurationCommandNack nack => new ConfigurationResult.Failure(nack.Reason),
-            _ => new ConfigurationResult.Failure($"Unexpected response type: {result.GetType().Name}"),
-        };
     }
 }

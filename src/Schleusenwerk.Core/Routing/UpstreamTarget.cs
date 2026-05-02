@@ -1,3 +1,5 @@
+using Schleusenwerk.HealthCheck;
+
 namespace Schleusenwerk.Routing;
 
 /// <summary>
@@ -8,6 +10,7 @@ public sealed record UpstreamTarget
     public required UpstreamUrl Url { get; init; }
     public int Weight { get; init; } = 1;
     public int MaxConnections { get; init; } = 100;
+    public HealthCheckConfig HealthCheck { get; init; } = new();
 
     public static UpstreamTarget Create(string url, int weight = 1, int maxConnections = 100)
     {

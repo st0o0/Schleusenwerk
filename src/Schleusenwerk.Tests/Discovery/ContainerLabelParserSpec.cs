@@ -1,5 +1,4 @@
 using Schleusenwerk.Discovery;
-using Schleusenwerk.Routing;
 using Xunit;
 
 namespace Schleusenwerk.Tests.Discovery;

@@ -109,7 +109,7 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
             new AddUpstream(config.DomainName, upstream), Timeout);
 
         var result = await entity.Ask<DomainConfigResult>(
-            GetDomainConfig.Instance, Timeout);
+            new GetDomainConfig { Domain = "example.com" }, Timeout);
 
         Assert.Equal(config.DomainName, result.Config.DomainName);
         Assert.Single(result.Upstreams);
@@ -138,9 +138,9 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
         var hosts = new List<string>();
         for (var i = 0; i < 6; i++)
         {
-            var fwd = await entity.Ask<SelectUpstreamForDomain>(
+            var fwd = await entity.Ask<UpstreamResolved>(
                 new ResolveUpstream("example.com"), Timeout);
-            hosts.Add(new Uri(fwd.Url).Host);
+            hosts.Add(fwd.Target.Url.Value.Host);
         }
 
         Assert.Equal(2, hosts.Count(h => h == "a"));
@@ -163,7 +163,7 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
             new RemoveUpstream(config.DomainName, upstream.Url), Timeout);
 
         var result = await entity.Ask<DomainConfigResult>(
-            GetDomainConfig.Instance, Timeout);
+            new GetDomainConfig { Domain = "example.com" }, Timeout);
         Assert.Empty(result.Upstreams);
     }
 
@@ -202,9 +202,9 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
         // Resolve 4 times - should only get upstream2
         for (var i = 0; i < 4; i++)
         {
-            var fwd = await entity.Ask<SelectUpstreamForDomain>(
+            var fwd = await entity.Ask<UpstreamResolved>(
                 new ResolveUpstream("example.com"), Timeout);
-            Assert.Contains("b", fwd.Url);
+            Assert.Contains("b", fwd.Target.Url.Value.Host);
         }
 
         // Mark upstream1 as healthy again
@@ -214,9 +214,9 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
         var hosts = new List<string>();
         for (var i = 0; i < 4; i++)
         {
-            var fwd = await entity.Ask<SelectUpstreamForDomain>(
+            var fwd = await entity.Ask<UpstreamResolved>(
                 new ResolveUpstream("example.com"), Timeout);
-            hosts.Add(new Uri(fwd.Url).Host);
+            hosts.Add(fwd.Target.Url.Value.Host);
         }
 
         Assert.Contains("a", hosts);

@@ -2,6 +2,7 @@ using Akka.Actor;
 using Akka.Event;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Servus.Akka;
 using System.Runtime.InteropServices;
@@ -219,8 +220,8 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
             ForceHttps = true,
         };
 
-        // Send SetRoute to the DomainEntityActor shard region
-        _domainRegion.Tell(new SetRoute(domainConfig, [parsed.Upstream]));
+        _domainRegion.Tell(new AddDomain(domainConfig));
+        _domainRegion.Tell(new AddUpstream(parsed.Domain, parsed.Upstream));
 
         _log.Info("Registered container {Id} → {Domain} @ {Url}", containerId[..12], parsed.Domain, parsed.Upstream.Url);
     }
@@ -232,8 +233,7 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
             return;
         }
 
-        // Send RemoveDomain to the DomainEntityActor shard region
-        _domainRegion.Tell(new RemoveDomain(entry.Domain));
+        _domainRegion.Tell(new RemoveUpstream(entry.Domain, entry.Url));
 
         _log.Info("Unregistered container {Id} upstream {Url}", containerId[..12], entry.Url);
     }

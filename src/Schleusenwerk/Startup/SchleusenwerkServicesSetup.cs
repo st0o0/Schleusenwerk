@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Schleusenwerk.Certificates;
 using Schleusenwerk.Forwarding;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
@@ -20,50 +19,23 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         services.AddSingleton<HeaderManipulationFilter>();
         services.AddSingleton<WebSocketTunnel>();
         services.AddSingleton<IProxyDispatcher, ProxyDispatcher>();
-        var connectionString = configuration["Akka:Persistence:ConnectionString"] ?? "Data Source=/data/schleusenwerk.db";
+
+        var connectionString = configuration["Akka:Persistence:ConnectionString"]
+            ?? "Data Source=/data/schleusenwerk.db";
         services.AddSingleton<IConfigurationStore>(new SqliteConfigurationStore(connectionString));
         services.AddSingleton<IConfigurationService, ConfigurationService>();
 
+        var certsPath = configuration["Certificates:Path"] ?? "/certs";
+        services.AddSingleton<ICertificateStore>(new FileCertificateStore(certsPath));
+        services.AddSingleton<SniCertificateSelector>();
+
         services.Configure<KestrelServerOptions>(options =>
         {
-            var certificate = GenerateSelfSignedCertificate();
             options.ConfigureHttpsDefaults(adapterOptions =>
             {
-                adapterOptions.ServerCertificate = certificate;
+                var selector = options.ApplicationServices!.GetRequiredService<SniCertificateSelector>();
+                adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
             });
         });
-    }
-
-    private static X509Certificate2 GenerateSelfSignedCertificate()
-    {
-        using (var rsa = RSA.Create(2048))
-        {
-            var request = new CertificateRequest(
-                "CN=localhost",
-                rsa,
-                HashAlgorithmName.SHA256,
-                RSASignaturePadding.Pkcs1);
-
-            request.CertificateExtensions.Add(
-                new X509BasicConstraintsExtension(
-                    certificateAuthority: false,
-                    hasPathLengthConstraint: false,
-                    pathLengthConstraint: 0,
-                    critical: true));
-
-            request.CertificateExtensions.Add(
-                new X509EnhancedKeyUsageExtension(
-                    new OidCollection
-                    {
-                        new Oid("1.3.6.1.5.5.7.3.1"), // Server Authentication
-                    },
-                    critical: false));
-
-            var certificate = request.CreateSelfSigned(
-                notBefore: DateTimeOffset.UtcNow,
-                notAfter: DateTimeOffset.UtcNow.AddYears(1));
-
-            return certificate;
-        }
     }
 }

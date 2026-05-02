@@ -1,28 +1,38 @@
+using Akka.Actor;
+using Akka.Hosting;
+using Akka.Persistence.TestKit;
+using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Persistence;
+using Schleusenwerk.Routing;
+using Xunit;
+
 namespace Schleusenwerk.Tests.Persistence;
 
-/// <summary>
-/// TODO: Task 7 — rewrite ConfigurationService tests after removal of AddDomain/UpdateDomain/RemoveDomain commands.
-/// </summary>
-#if false
 public sealed class ConfigurationServiceSpec : PersistenceTestKit
 {
-    private int _actorCounter;
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+    private int _serviceCounter;
 
     private ConfigurationService CreateService()
     {
-        var id = Interlocked.Increment(ref _actorCounter);
+        var id = Interlocked.Increment(ref _serviceCounter);
         var registry = ActorRegistry.For(Sys);
+
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-svc-{id}");
         registry.Register<EventHub>(hub, overwrite: true);
-        var domainProbe = CreateTestProbe();
-        registry.Register<DomainEntityActor>(domainProbe, overwrite: true);
 
-        var actor = Sys.ActorOf(
-            Props.Create(() => new ConfigurationPersistenceActor()),
-            $"config-svc-{id}");
-        registry.Register<ConfigurationPersistenceActor>(actor, overwrite: true);
+        var upstreamProbe = CreateTestProbe();
+        registry.Register<UpstreamEntityActor>(upstreamProbe, overwrite: true);
 
-        return new ConfigurationService(registry, TimeSpan.FromSeconds(3));
+        var store = new SqliteConfigurationStore(
+            $"Data Source=test-svc-{id}-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
+
+        var domainActor = Sys.ActorOf(
+            Props.Create(() => new DomainEntityActor(store)),
+            $"domain-svc-{id}");
+        registry.Register<DomainEntityActor>(domainActor, overwrite: true);
+
+        return new ConfigurationService(registry, store, Timeout);
     }
 
     private static DomainConfig CreateDomainConfig(string domain)
@@ -33,19 +43,6 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
     private static UpstreamTarget CreateUpstream(string url)
     {
         return UpstreamTarget.Create(url);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task GetAllAsync_should_return_empty_snapshot_initially()
-    {
-        var service = CreateService();
-
-        var result = await service.GetAllAsync();
-
-        Assert.IsType<ConfigurationResult<ConfigurationSnapshot>.Success>(result);
-        var snapshot = ((ConfigurationResult<ConfigurationSnapshot>.Success)result).Value;
-        Assert.Empty(snapshot.Domains);
-        Assert.Empty(snapshot.Upstreams);
     }
 
     [Fact(Timeout = 5000)]
@@ -60,111 +57,30 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task AddDomainAsync_should_add_domain()
-    {
-        var service = CreateService();
-        var config = CreateDomainConfig("example.com");
-
-        await service.AddDomainAsync(config);
-
-        var result = await service.GetAllAsync();
-        var snapshot = ((ConfigurationResult<ConfigurationSnapshot>.Success)result).Value;
-        Assert.Single(snapshot.Domains);
-        Assert.Equal("example.com", snapshot.Domains[0].DomainName.Value);
-    }
-
-    [Fact(Timeout = 5000)]
     public async Task AddDomainAsync_should_return_failure_on_duplicate()
     {
         var service = CreateService();
         var config = CreateDomainConfig("example.com");
 
         await service.AddDomainAsync(config);
-
         var result = await service.AddDomainAsync(config);
+
         Assert.IsType<ConfigurationResult.Failure>(result);
-        var failure = (ConfigurationResult.Failure)result;
-        Assert.Contains("already exists", failure.Error);
+        Assert.Contains("already configured", ((ConfigurationResult.Failure)result).Error);
     }
 
     [Fact(Timeout = 5000)]
-    public async Task UpdateDomainAsync_should_update_existing_domain()
+    public async Task GetByDomainAsync_should_return_domain_config()
     {
         var service = CreateService();
         var config = CreateDomainConfig("example.com");
-
         await service.AddDomainAsync(config);
-        var result = await service.UpdateDomainAsync(config with { ForceHttps = true });
 
-        Assert.True(result.IsSuccess);
-        var queryResult = await service.GetByDomainAsync(DomainName.Parse("example.com"));
-        var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)queryResult).Value;
-        Assert.True(domainResult.Config.ForceHttps);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task UpdateDomainAsync_should_return_failure_for_nonexistent_domain()
-    {
-        var service = CreateService();
-        var config = CreateDomainConfig("missing.com");
-
-        var result = await service.UpdateDomainAsync(config);
-        Assert.IsType<ConfigurationResult.Failure>(result);
-        Assert.Contains("does not exist", ((ConfigurationResult.Failure)result).Error);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task RemoveDomainAsync_should_remove_domain()
-    {
-        var service = CreateService();
-        var config = CreateDomainConfig("example.com");
-
-        await service.AddDomainAsync(config);
-        var result = await service.RemoveDomainAsync(DomainName.Parse("example.com"));
-
-        Assert.True(result.IsSuccess);
-        var allResult = await service.GetAllAsync();
-        var snapshot = ((ConfigurationResult<ConfigurationSnapshot>.Success)allResult).Value;
-        Assert.Empty(snapshot.Domains);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task RemoveDomainAsync_should_return_failure_for_nonexistent_domain()
-    {
-        var service = CreateService();
-
-        var result = await service.RemoveDomainAsync(DomainName.Parse("missing.com"));
-        Assert.IsType<ConfigurationResult.Failure>(result);
-        Assert.Contains("does not exist", ((ConfigurationResult.Failure)result).Error);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task GetByDomainAsync_should_return_domain_with_upstreams()
-    {
-        var service = CreateService();
-        var config = CreateDomainConfig("example.com");
-        var domain = DomainName.Parse("example.com");
-        var upstream = CreateUpstream("http://localhost:8080");
-
-        await service.AddDomainAsync(config);
-        await service.AddUpstreamAsync(domain, upstream);
-
-        var result = await service.GetByDomainAsync(domain);
+        var result = await service.GetByDomainAsync(DomainName.Parse("example.com"));
 
         Assert.IsType<ConfigurationResult<DomainConfigResult>.Success>(result);
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
         Assert.Equal("example.com", domainResult.Config.DomainName.Value);
-        Assert.Single(domainResult.Upstreams);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task GetByDomainAsync_should_return_failure_for_nonexistent_domain()
-    {
-        var service = CreateService();
-
-        var result = await service.GetByDomainAsync(DomainName.Parse("missing.com"));
-        Assert.IsType<ConfigurationResult<DomainConfigResult>.Failure>(result);
-        Assert.Contains("does not exist", ((ConfigurationResult<DomainConfigResult>.Failure)result).Error);
     }
 
     [Fact(Timeout = 5000)]
@@ -172,26 +88,17 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
     {
         var service = CreateService();
         var config = CreateDomainConfig("example.com");
-        var domain = DomainName.Parse("example.com");
-
         await service.AddDomainAsync(config);
-        await service.AddUpstreamAsync(domain, CreateUpstream("http://localhost:8080"));
-        await service.AddUpstreamAsync(domain, CreateUpstream("http://localhost:8081"));
 
-        var result = await service.GetByDomainAsync(domain);
-        var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
-        Assert.Equal(2, domainResult.Upstreams.Count);
-    }
+        var result = await service.AddUpstreamAsync(
+            DomainName.Parse("example.com"),
+            CreateUpstream("http://localhost:8080"));
 
-    [Fact(Timeout = 5000)]
-    public async Task AddUpstreamAsync_should_return_failure_for_nonexistent_domain()
-    {
-        var service = CreateService();
+        Assert.True(result.IsSuccess);
 
-        var result =
-            await service.AddUpstreamAsync(DomainName.Parse("missing.com"), CreateUpstream("http://localhost:8080"));
-        Assert.IsType<ConfigurationResult.Failure>(result);
-        Assert.Contains("does not exist", ((ConfigurationResult.Failure)result).Error);
+        var queryResult = await service.GetByDomainAsync(DomainName.Parse("example.com"));
+        var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)queryResult).Value;
+        Assert.Single(domainResult.Upstreams);
     }
 
     [Fact(Timeout = 5000)]
@@ -199,30 +106,47 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
     {
         var service = CreateService();
         var config = CreateDomainConfig("example.com");
-        var domain = DomainName.Parse("example.com");
-
         await service.AddDomainAsync(config);
-        await service.AddUpstreamAsync(domain, CreateUpstream("http://localhost:8080"));
-        var result = await service.RemoveUpstreamAsync(domain, UpstreamUrl.Parse("http://localhost:8080"));
+        await service.AddUpstreamAsync(
+            DomainName.Parse("example.com"),
+            CreateUpstream("http://localhost:8080"));
+
+        var result = await service.RemoveUpstreamAsync(
+            DomainName.Parse("example.com"),
+            UpstreamUrl.Parse("http://localhost:8080"));
 
         Assert.True(result.IsSuccess);
-        var queryResult = await service.GetByDomainAsync(domain);
+
+        var queryResult = await service.GetByDomainAsync(DomainName.Parse("example.com"));
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)queryResult).Value;
         Assert.Empty(domainResult.Upstreams);
     }
 
     [Fact(Timeout = 5000)]
-    public async Task RemoveUpstreamAsync_should_return_failure_for_nonexistent_upstream()
+    public async Task RemoveDomainAsync_should_return_success()
     {
         var service = CreateService();
         var config = CreateDomainConfig("example.com");
-        var domain = DomainName.Parse("example.com");
-
         await service.AddDomainAsync(config);
 
-        var result = await service.RemoveUpstreamAsync(domain, UpstreamUrl.Parse("http://localhost:9999"));
-        Assert.IsType<ConfigurationResult.Failure>(result);
-        Assert.Contains("does not exist", ((ConfigurationResult.Failure)result).Error);
+        var result = await service.RemoveDomainAsync(DomainName.Parse("example.com"));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task UpdateDomainAsync_should_update_existing()
+    {
+        var service = CreateService();
+        var config = CreateDomainConfig("example.com");
+        await service.AddDomainAsync(config);
+
+        var result = await service.UpdateDomainAsync(config with { ForceHttps = true });
+
+        Assert.True(result.IsSuccess);
+        var queryResult = await service.GetByDomainAsync(DomainName.Parse("example.com"));
+        var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)queryResult).Value;
+        Assert.True(domainResult.Config.ForceHttps);
     }
 
     [Fact(Timeout = 5000)]
@@ -233,43 +157,5 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
         var result = await service.GetSettingsAsync();
 
         Assert.IsType<ConfigurationResult<ProxySettings>.Success>(result);
-        var settings = ((ConfigurationResult<ProxySettings>.Success)result).Value;
-        Assert.Equal(ProxySettings.Default.DefaultRequestTimeout, settings.DefaultRequestTimeout);
-        Assert.Equal(ProxySettings.Default.MaxConnectionsPerUpstream, settings.MaxConnectionsPerUpstream);
-        Assert.False(settings.ForceHttpsGlobally);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task UpdateSettingsAsync_should_update_settings()
-    {
-        var service = CreateService();
-        var newSettings = new ProxySettings
-        {
-            ForceHttpsGlobally = true,
-            MaxConnectionsPerUpstream = 50,
-        };
-
-        var result = await service.UpdateSettingsAsync(newSettings);
-
-        Assert.True(result.IsSuccess);
-        var settingsResult = await service.GetSettingsAsync();
-        var settings = ((ConfigurationResult<ProxySettings>.Success)settingsResult).Value;
-        Assert.True(settings.ForceHttpsGlobally);
-        Assert.Equal(50, settings.MaxConnectionsPerUpstream);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task GetAllAsync_should_reflect_multiple_domains()
-    {
-        var service = CreateService();
-
-        await service.AddDomainAsync(CreateDomainConfig("a.com"));
-        await service.AddDomainAsync(CreateDomainConfig("b.com"));
-        await service.AddDomainAsync(CreateDomainConfig("c.com"));
-
-        var result = await service.GetAllAsync();
-        var snapshot = ((ConfigurationResult<ConfigurationSnapshot>.Success)result).Value;
-        Assert.Equal(3, snapshot.Domains.Count);
     }
 }
-#endif

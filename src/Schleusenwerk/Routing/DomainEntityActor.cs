@@ -6,7 +6,6 @@ using Akka.Streams.Dsl;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Servus.Akka;
-using PersistenceRemoveDomain = Schleusenwerk.Persistence.RemoveDomain;
 
 namespace Schleusenwerk.Routing;
 
@@ -106,11 +105,10 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         });
         Command<AddDomain>(HandleAddDomain);
         Command<UpdateDomain>(HandleUpdateDomain);
-        Command<PersistenceRemoveDomain>(HandleRemoveDomain);
+        Command<RemoveDomain>(HandleRemoveDomain);
         Command<AddUpstream>(HandleAddUpstream);
         Command<RemoveUpstream>(HandleRemoveUpstream);
         Command<GetDomainConfig>(_ => HandleGetConfig());
-        Command<GetDomainByName>(_ => HandleGetConfig());
         Command<ResolveUpstream>(HandleResolveUpstream);
         Command<UpstreamHealthChanged>(msg =>
         {
@@ -162,7 +160,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         });
     }
 
-    private void HandleRemoveDomain(PersistenceRemoveDomain cmd)
+    private void HandleRemoveDomain(RemoveDomain cmd)
     {
         if (_config is null)
         {
@@ -253,7 +251,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
 
         var picked = healthy[_roundRobinIndex % healthy.Count];
         _roundRobinIndex++;
-        Sender.Tell(new SelectUpstreamForDomain(_config, picked.Url.Value.ToString()));
+        Sender.Tell(new UpstreamResolved(picked, _config));
     }
 
     private void PublishEvent(IClusterEvent evt)

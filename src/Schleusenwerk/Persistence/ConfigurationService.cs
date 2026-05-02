@@ -37,7 +37,7 @@ public sealed class ConfigurationService : IConfigurationService
         DomainName domainName, CancellationToken cancellationToken = default)
     {
         var result = await _domainRegion.Ask<object>(
-            new GetDomainByName(domainName), _timeout, cancellationToken);
+            new GetDomainConfig { Domain = domainName.Value }, _timeout, cancellationToken);
 
         return result switch
         {
@@ -50,7 +50,7 @@ public sealed class ConfigurationService : IConfigurationService
     public async Task<ConfigurationResult> AddDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
     {
         var result = await _domainRegion.Ask<object>(
-            new SetRoute(config, []), _timeout, cancellationToken);
+            new AddDomain(config), _timeout, cancellationToken);
 
         return result switch
         {
@@ -62,17 +62,8 @@ public sealed class ConfigurationService : IConfigurationService
 
     public async Task<ConfigurationResult> UpdateDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
     {
-        var queryResult = await _domainRegion.Ask<object>(
-            new GetDomainByName(config.DomainName), _timeout, cancellationToken);
-
-        var upstreams = queryResult switch
-        {
-            DomainConfigResult domainResult => domainResult.Upstreams.ToList(),
-            _ => new List<UpstreamTarget>(),
-        };
-
         var result = await _domainRegion.Ask<object>(
-            new SetRoute(config, upstreams), _timeout, cancellationToken);
+            new UpdateDomain(config), _timeout, cancellationToken);
 
         return result switch
         {
@@ -98,22 +89,8 @@ public sealed class ConfigurationService : IConfigurationService
     public async Task<ConfigurationResult> AddUpstreamAsync(
         DomainName domainName, UpstreamTarget upstream, CancellationToken cancellationToken = default)
     {
-        var queryResult = await _domainRegion.Ask<object>(
-            new GetDomainByName(domainName), _timeout, cancellationToken);
-
-        if (queryResult is not DomainConfigResult domainResult)
-        {
-            return new ConfigurationResult.Failure("Domain not found or query failed.");
-        }
-
-        if (domainResult.Upstreams.Any(u => u.Url.Equals(upstream.Url)))
-        {
-            return new ConfigurationResult.Failure($"Upstream '{upstream.Url}' already exists.");
-        }
-
-        var upstreams = domainResult.Upstreams.Append(upstream).ToList();
         var result = await _domainRegion.Ask<object>(
-            new SetRoute(domainResult.Config, upstreams), _timeout, cancellationToken);
+            new AddUpstream(domainName, upstream), _timeout, cancellationToken);
 
         return result switch
         {
@@ -126,25 +103,8 @@ public sealed class ConfigurationService : IConfigurationService
     public async Task<ConfigurationResult> RemoveUpstreamAsync(
         DomainName domainName, UpstreamUrl upstreamUrl, CancellationToken cancellationToken = default)
     {
-        var queryResult = await _domainRegion.Ask<object>(
-            new GetDomainByName(domainName), _timeout, cancellationToken);
-
-        if (queryResult is not DomainConfigResult domainResult)
-        {
-            return new ConfigurationResult.Failure("Domain not found or query failed.");
-        }
-
-        if (!domainResult.Upstreams.Any(u => u.Url.Equals(upstreamUrl)))
-        {
-            return new ConfigurationResult.Failure($"Upstream '{upstreamUrl}' does not exist.");
-        }
-
-        var upstreams = domainResult.Upstreams
-            .Where(u => !u.Url.Equals(upstreamUrl))
-            .ToList();
-
         var result = await _domainRegion.Ask<object>(
-            new SetRoute(domainResult.Config, upstreams), _timeout, cancellationToken);
+            new RemoveUpstream(domainName, upstreamUrl), _timeout, cancellationToken);
 
         return result switch
         {

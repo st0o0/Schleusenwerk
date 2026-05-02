@@ -5,6 +5,7 @@ using Akka.Hosting;
 using Akka.Persistence.Sql.Hosting;
 using Akka.Remote.Hosting;
 using LinqToDB;
+using Schleusenwerk.Certificates;
 using Schleusenwerk.Discovery;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
@@ -67,6 +68,9 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
 
             var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
             registry.Register<DockerDiscoveryActor>(dockerDiscovery);
+
+            var certProvisioning = system.ActorOf(resolver.Props<CertificateProvisioningActor>(), "cert-provisioning");
+            registry.Register<CertificateProvisioningActor>(certProvisioning);
         });
     }
 }

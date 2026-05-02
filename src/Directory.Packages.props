@@ -4,6 +4,7 @@
     </PropertyGroup>
     <ItemGroup Label="Akka.NET">
         <PackageVersion Include="Akka.Streams" Version="1.5.65"/>
+        <PackageVersion Include="Akka.Cluster.Hosting" Version="1.5.65"/>
         <PackageVersion Include="Akka.Persistence.Sql.Hosting" Version="1.5.62"/>
         <PackageVersion Include="Akka.TestKit.Xunit" Version="1.5.65"/>
         <PackageVersion Include="Akka.Persistence.TestKit.Xunit" Version="1.5.65"/>

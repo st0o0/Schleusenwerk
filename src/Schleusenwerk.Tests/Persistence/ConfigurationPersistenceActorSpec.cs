@@ -21,6 +21,8 @@ public sealed class ConfigurationPersistenceActorSpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{id}");
         var registry = ActorRegistry.For(Sys);
         registry.Register<EventHub>(hub);
+        var domainProbe = CreateTestProbe();
+        registry.Register<DomainEntityActor>(domainProbe);
         var config = Sys.ActorOf(Props.Create(() => new ConfigurationPersistenceActor(snapshotInterval)), $"config-{id:D4}");
         return (hub, config);
     }

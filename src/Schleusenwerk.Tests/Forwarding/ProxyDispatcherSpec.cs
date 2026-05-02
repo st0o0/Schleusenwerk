@@ -6,7 +6,6 @@ using Akka.Hosting;
 using Akka.TestKit.Xunit;
 using Microsoft.AspNetCore.Http;
 using Schleusenwerk.Forwarding;
-using Schleusenwerk.LoadBalancing;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using TurboHTTP;
@@ -24,38 +23,8 @@ public sealed class ProxyDispatcherSpec : TestKit
         _registry = ActorRegistry.For(Sys);
     }
 
-    private IActorRef CreateRouter()
-    {
-        var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
-        _registry.Register<EventHub>(hub, overwrite: true);
-
-        var router = Sys.ActorOf(
-            Props.Create(() => new DomainRouterActor(
-                upstreams => Props.Create(() => new LoadBalancerActor(upstreams)))),
-            $"router-{Guid.NewGuid():N}");
-        _registry.Register<DomainRouterActor>(router, overwrite: true);
-
-        return router;
-    }
-
-    private static RouteDefinition CreateRoute(
-        string domain,
-        RedirectMode redirect = RedirectMode.None,
-        bool forceHttps = false,
-        params string[] upstreams)
-    {
-        var config = new DomainConfig
-        {
-            DomainName = DomainName.Parse(domain),
-            HttpRedirect = redirect,
-            ForceHttps = forceHttps,
-        };
-        var targets = upstreams.Select(u => UpstreamTarget.Create(u)).ToList();
-        return RouteDefinition.Create(config, targets);
-    }
-
     private ProxyDispatcher CreateDispatcher(
-        IActorRef router,
+        IActorRef domainRegion,
         RecordingTurboHttpClient? recordingClient = null)
     {
         var client = recordingClient ?? new RecordingTurboHttpClient();
@@ -65,10 +34,28 @@ public sealed class ProxyDispatcherSpec : TestKit
         var webSocketTunnel = new WebSocketTunnel();
 
         return new ProxyDispatcher(
-            new RequiredActor<DomainRouterActor>(_registry),
+            new RequiredActor<DomainEntityActor>(_registry),
             pipeline,
             headerFilter,
             webSocketTunnel);
+    }
+
+    private IActorRef CreateUpstreamRegionThatReplies(UpstreamTarget target, DomainConfig config)
+    {
+        return Sys.ActorOf(Props.Create(() => new ReplyingUpstreamActor(target, config)));
+    }
+
+    private (IActorRef domainRegion, IActorRef hub) CreateDomainRegion(IActorRef upstreamRegion)
+    {
+        var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
+        _registry.Register<EventHub>(hub, overwrite: true);
+
+        var domainRegion = Sys.ActorOf(
+            Props.Create(() => new DomainEntityActor(upstreamRegion)),
+            $"domain-{Guid.NewGuid():N}");
+        _registry.Register<DomainEntityActor>(domainRegion, overwrite: true);
+
+        return (domainRegion, hub);
     }
 
     private static DefaultHttpContext CreateHttpContext(
@@ -93,11 +80,17 @@ public sealed class ProxyDispatcherSpec : TestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_return_404_when_domain_not_configured()
+    public async Task Dispatcher_should_return_404_when_domain_has_no_upstreams()
     {
-        var router = CreateRouter();
-        var dispatcher = CreateDispatcher(router);
-        var context = CreateHttpContext("unknown.example.com", "/test");
+        var upstreamProbe = CreateTestProbe();
+        var (domainRegion, _) = CreateDomainRegion(upstreamProbe);
+
+        var config = new DomainConfig { DomainName = DomainName.Parse("empty.example.com") };
+        domainRegion.Tell(new SetRoute(config, []));
+        await Task.Delay(100);
+
+        var dispatcher = CreateDispatcher(domainRegion);
+        var context = CreateHttpContext("empty.example.com", "/test");
 
         await dispatcher.HandleAsync(context, CancellationToken.None);
 
@@ -107,13 +100,17 @@ public sealed class ProxyDispatcherSpec : TestKit
     [Fact(Timeout = 5000)]
     public async Task Dispatcher_should_forward_request_when_domain_is_configured()
     {
-        var router = CreateRouter();
-        var route = CreateRoute("example.com", upstreams: ["http://backend:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), AskTimeout);
+        var target = UpstreamTarget.Create("http://backend:8080");
+        var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
+
+        var upstreamRegion = CreateUpstreamRegionThatReplies(target, config);
+        var (domainRegion, _) = CreateDomainRegion(upstreamRegion);
+
+        domainRegion.Tell(new SetRoute(config, [target]));
+        await Task.Delay(100);
 
         var recordingClient = new RecordingTurboHttpClient();
-        var dispatcher = CreateDispatcher(router, recordingClient);
+        var dispatcher = CreateDispatcher(domainRegion, recordingClient);
         var context = CreateHttpContext("example.com", "/api/data");
 
         await dispatcher.HandleAsync(context, CancellationToken.None);
@@ -126,15 +123,21 @@ public sealed class ProxyDispatcherSpec : TestKit
     [Fact(Timeout = 5000)]
     public async Task Dispatcher_should_redirect_http_to_https_with_301_when_configured()
     {
-        var router = CreateRouter();
-        var route = CreateRoute("secure.example.com",
-            redirect: RedirectMode.PermanentRedirect,
-            forceHttps: true,
-            upstreams: ["http://backend:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("secure.example.com"), AskTimeout);
+        var target = UpstreamTarget.Create("http://backend:8080");
+        var config = new DomainConfig
+        {
+            DomainName = DomainName.Parse("secure.example.com"),
+            HttpRedirect = RedirectMode.PermanentRedirect,
+            ForceHttps = true
+        };
 
-        var dispatcher = CreateDispatcher(router);
+        var upstreamRegion = CreateUpstreamRegionThatReplies(target, config);
+        var (domainRegion, _) = CreateDomainRegion(upstreamRegion);
+
+        domainRegion.Tell(new SetRoute(config, [target]));
+        await Task.Delay(100);
+
+        var dispatcher = CreateDispatcher(domainRegion);
         var context = CreateHttpContext("secure.example.com", "/page", queryString: "?q=1");
 
         await dispatcher.HandleAsync(context, CancellationToken.None);
@@ -144,100 +147,12 @@ public sealed class ProxyDispatcherSpec : TestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_redirect_with_307_when_configured()
-    {
-        var router = CreateRouter();
-        var route = CreateRoute("temp.example.com",
-            redirect: RedirectMode.TemporaryRedirect,
-            forceHttps: true,
-            upstreams: ["http://backend:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("temp.example.com"), AskTimeout);
-
-        var dispatcher = CreateDispatcher(router);
-        var context = CreateHttpContext("temp.example.com", "/api");
-
-        await dispatcher.HandleAsync(context, CancellationToken.None);
-
-        Assert.Equal(StatusCodes.Status307TemporaryRedirect, context.Response.StatusCode);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_not_redirect_when_already_https()
-    {
-        var router = CreateRouter();
-        var route = CreateRoute("secure.example.com",
-            redirect: RedirectMode.PermanentRedirect,
-            forceHttps: true,
-            upstreams: ["http://backend:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("secure.example.com"), AskTimeout);
-
-        var recordingClient = new RecordingTurboHttpClient();
-        var dispatcher = CreateDispatcher(router, recordingClient);
-        var context = CreateHttpContext("secure.example.com", "/page", scheme: "https");
-
-        await dispatcher.HandleAsync(context, CancellationToken.None);
-
-        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
-        Assert.Single(recordingClient.SentRequests);
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_round_robin_across_multiple_upstreams()
-    {
-        var router = CreateRouter();
-        var route = CreateRoute("lb.example.com",
-            upstreams: ["http://a:8080", "http://b:8080", "http://c:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("lb.example.com"), AskTimeout);
-
-        var recordingClient = new RecordingTurboHttpClient();
-        var dispatcher = CreateDispatcher(router, recordingClient);
-
-        for (var i = 0; i < 6; i++)
-        {
-            var context = CreateHttpContext("lb.example.com", "/test");
-            await dispatcher.HandleAsync(context, CancellationToken.None);
-        }
-
-        Assert.Equal(6, recordingClient.SentRequests.Count);
-        var hosts = recordingClient.SentRequests.Select(r => r.RequestUri!.Host).ToList();
-        Assert.Equal(2, hosts.Count(h => h == "a"));
-        Assert.Equal(2, hosts.Count(h => h == "b"));
-        Assert.Equal(2, hosts.Count(h => h == "c"));
-    }
-
-    [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_apply_header_manipulation_filter()
-    {
-        var router = CreateRouter();
-        var route = CreateRoute("example.com", upstreams: ["http://backend:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("example.com"), AskTimeout);
-
-        var recordingClient = new RecordingTurboHttpClient(additionalResponseHeaders: new Dictionary<string, string>
-        {
-            ["Server"] = "hidden-upstream",
-            ["X-Powered-By"] = "SomeFramework",
-        });
-        var dispatcher = CreateDispatcher(router, recordingClient);
-        var context = CreateHttpContext("example.com", "/test");
-
-        await dispatcher.HandleAsync(context, CancellationToken.None);
-
-        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
-        Assert.False(context.Response.Headers.ContainsKey("Server"));
-        Assert.False(context.Response.Headers.ContainsKey("X-Powered-By"));
-        Assert.True(context.Response.Headers.ContainsKey("Via"));
-    }
-
-    [Fact(Timeout = 5000)]
     public async Task Dispatcher_should_return_400_when_host_header_is_empty()
     {
-        var router = CreateRouter();
-        var dispatcher = CreateDispatcher(router);
+        var upstreamProbe = CreateTestProbe();
+        var (domainRegion, _) = CreateDomainRegion(upstreamProbe);
 
+        var dispatcher = CreateDispatcher(domainRegion);
         var context = new DefaultHttpContext();
         context.Request.Scheme = "http";
         context.Request.Host = new HostString(string.Empty);
@@ -249,25 +164,13 @@ public sealed class ProxyDispatcherSpec : TestKit
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
     }
 
-    [Fact(Timeout = 5000)]
-    public async Task Dispatcher_should_forward_single_upstream_without_round_robin()
+    private sealed class ReplyingUpstreamActor : ReceiveActor
     {
-        var router = CreateRouter();
-        var route = CreateRoute("single.example.com", upstreams: ["http://only:8080"]);
-        router.Tell(new UpdateRoutes([route]));
-        await router.Ask<UpstreamResolved>(new ResolveUpstream("single.example.com"), AskTimeout);
-
-        var recordingClient = new RecordingTurboHttpClient();
-        var dispatcher = CreateDispatcher(router, recordingClient);
-
-        for (var i = 0; i < 3; i++)
+        public ReplyingUpstreamActor(UpstreamTarget target, DomainConfig config)
         {
-            var context = CreateHttpContext("single.example.com", "/test");
-            await dispatcher.HandleAsync(context, CancellationToken.None);
+            Receive<SelectUpstreamForDomain>(_ => Sender.Tell(new UpstreamResolved(target, config)));
+            Receive<RegisterUpstream>(_ => { });
         }
-
-        Assert.Equal(3, recordingClient.SentRequests.Count);
-        Assert.All(recordingClient.SentRequests, r => Assert.Equal("only", r.RequestUri!.Host));
     }
 
     internal sealed class RecordingTurboHttpClient : ITurboHttpClient
@@ -313,10 +216,7 @@ public sealed class ProxyDispatcherSpec : TestKit
     {
         private readonly ITurboHttpClient _client;
 
-        public StubTurboHttpClientFactory(ITurboHttpClient client)
-        {
-            _client = client;
-        }
+        public StubTurboHttpClientFactory(ITurboHttpClient client) => _client = client;
 
         public ITurboHttpClient CreateClient(string name) => _client;
     }

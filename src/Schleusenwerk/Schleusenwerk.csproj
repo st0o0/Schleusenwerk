@@ -2,6 +2,7 @@
 
     <ItemGroup>
         <PackageReference Include="Akka.Streams" />
+        <PackageReference Include="Akka.Cluster.Hosting" />
         <PackageReference Include="Akka.Persistence.Sql.Hosting" />
         <PackageReference Include="Docker.DotNet" />
         <PackageReference Include="Microsoft.Data.Sqlite" />

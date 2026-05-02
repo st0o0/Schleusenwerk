@@ -18,6 +18,8 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
         var registry = ActorRegistry.For(Sys);
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-svc-{id}");
         registry.Register<EventHub>(hub, overwrite: true);
+        var domainProbe = CreateTestProbe();
+        registry.Register<DomainEntityActor>(domainProbe, overwrite: true);
 
         var actor = Sys.ActorOf(
             Props.Create(() => new ConfigurationPersistenceActor()),

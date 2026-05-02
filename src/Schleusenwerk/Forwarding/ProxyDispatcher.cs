@@ -6,19 +6,19 @@ namespace Schleusenwerk.Forwarding;
 
 internal sealed class ProxyDispatcher : IProxyDispatcher
 {
-    private readonly IActorRef _domainRouter;
+    private readonly IActorRef _domainRegion;
     private readonly RequestForwardingPipeline _pipeline;
     private readonly HeaderManipulationFilter _headerFilter;
     private readonly WebSocketTunnel _webSocketTunnel;
     private static readonly TimeSpan AskTimeout = TimeSpan.FromSeconds(5);
 
     public ProxyDispatcher(
-        IRequiredActor<DomainRouterActor> domainRouterProvider,
+        IRequiredActor<DomainEntityActor> domainRegionProvider,
         RequestForwardingPipeline pipeline,
         HeaderManipulationFilter headerFilter,
         WebSocketTunnel webSocketTunnel)
     {
-        _domainRouter = domainRouterProvider.ActorRef;
+        _domainRegion = domainRegionProvider.ActorRef;
         _pipeline = pipeline;
         _headerFilter = headerFilter;
         _webSocketTunnel = webSocketTunnel;
@@ -34,7 +34,7 @@ internal sealed class ProxyDispatcher : IProxyDispatcher
             return;
         }
 
-        var response = await _domainRouter.Ask<object>(
+        var response = await _domainRegion.Ask<object>(
             new ResolveUpstream(host),
             AskTimeout,
             ct);

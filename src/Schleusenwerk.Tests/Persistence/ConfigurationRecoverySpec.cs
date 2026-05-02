@@ -21,6 +21,8 @@ public sealed class ConfigurationRecoverySpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{Guid.NewGuid():N}");
         var registry = ActorRegistry.For(Sys);
         registry.Register<EventHub>(hub, overwrite: true);
+        var domainProbe = CreateTestProbe();
+        registry.Register<DomainEntityActor>(domainProbe, overwrite: true);
         var actor = Sys.ActorOf(Props.Create(() => new ConfigurationPersistenceActor(snapshotInterval)), name);
         return (hub, actor);
     }
@@ -29,6 +31,7 @@ public sealed class ConfigurationRecoverySpec : PersistenceTestKit
     {
         var registry = ActorRegistry.For(Sys);
         registry.Register<EventHub>(hub, overwrite: true);
+        registry.Register<DomainEntityActor>(CreateTestProbe(), overwrite: true);
         return Sys.ActorOf(Props.Create(() => new ConfigurationPersistenceActor(snapshotInterval)), name);
     }
 

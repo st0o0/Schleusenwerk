@@ -5,6 +5,7 @@ using Akka.Persistence;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Schleusenwerk.Routing;
+using RoutingRemoveDomain = Schleusenwerk.Routing.RemoveDomain;
 using Servus.Akka;
 
 namespace Schleusenwerk.Persistence;
@@ -27,6 +28,7 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
     private readonly IActorRef _eventHub;
     private IMaterializer _materializer = null!;
     private ISourceQueueWithComplete<IClusterEvent>? _publishQueue;
+    private IActorRef _domainRegion = null!;
 
     public ConfigurationPersistenceActor(int snapshotInterval = 100, int keepSnapshots = 3)
     {
@@ -68,7 +70,17 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
             _publishQueue = Source.Queue<IClusterEvent>(100, OverflowStrategy.DropHead)
                 .To(sink)
                 .Run(_materializer);
-            _log.Info("Publisher channel to EventHubActor established");
+            _domainRegion = Context.GetActor<DomainEntityActor>();
+
+            foreach (var (domainName, domainConfig) in _state.Domains)
+            {
+                var upstreams = _state.Upstreams.TryGetValue(domainName, out var list)
+                    ? list
+                    : (IReadOnlyList<UpstreamTarget>)[];
+                _domainRegion.Tell(new SetRoute(domainConfig, upstreams));
+            }
+
+            _log.Info("Publisher channel to EventHubActor established; replayed {Count} route(s)", _state.Domains.Count);
             Become(Ready);
             Stash.UnstashAll();
         });
@@ -138,6 +150,10 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
         {
             _log.Info("Domain updated: {Domain}", cmd.Config.DomainName);
             PublishClusterEvent(evt);
+            var upstreams = _state.Upstreams.TryGetValue(cmd.Config.DomainName, out var list)
+                ? list
+                : (IReadOnlyList<UpstreamTarget>)[];
+            _domainRegion.Tell(new SetRoute(_state.Domains[cmd.Config.DomainName], upstreams));
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
     }
@@ -156,6 +172,7 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
         {
             _log.Info("Domain removed: {Domain}", cmd.DomainName);
             PublishClusterEvent(evt);
+            _domainRegion.Tell(new RoutingRemoveDomain(cmd.DomainName));
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
     }
@@ -173,6 +190,8 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
         PersistAndApply(evt, () =>
         {
             _log.Info("Upstream added to {Domain}: {Url}", cmd.DomainName, cmd.Upstream.Url);
+            var upstreams = _state.Upstreams[cmd.DomainName];
+            _domainRegion.Tell(new SetRoute(_state.Domains[cmd.DomainName], upstreams));
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
     }
@@ -190,6 +209,10 @@ public sealed class ConfigurationPersistenceActor : ReceivePersistentActor, IWit
         PersistAndApply(evt, () =>
         {
             _log.Info("Upstream removed from {Domain}: {Url}", cmd.DomainName, cmd.UpstreamUrl);
+            var upstreams = _state.Upstreams.TryGetValue(cmd.DomainName, out var list)
+                ? list
+                : (IReadOnlyList<UpstreamTarget>)[];
+            _domainRegion.Tell(new SetRoute(_state.Domains[cmd.DomainName], upstreams));
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
     }

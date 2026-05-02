@@ -145,13 +145,13 @@ Establish the long-term structural foundation for Schleusenwerk. The current cod
 **Model:** haiku
 
 **Acceptance Criteria:**
-- [ ] `docker-compose.yml` exists at repo root
-- [ ] `proxy` service uses `src/Schleusenwerk/Dockerfile`, mounts `/var/run/docker.sock`, a named volume for SQLite (`db:/data`), and a named volume for certificates (`certs:/certs`); exposes ports 80, 443, 5000
-- [ ] `ui` service uses `src/Schleusenwerk.UI/Dockerfile`, exposes port 8080, has `PROXY_GRPC_ENDPOINT=http://proxy:5000` env var
-- [ ] Named volumes `db` and `certs` are declared
-- [ ] `docker compose up` starts both containers without errors
-- [ ] Proxy container logs show Akka actor system started
-- [ ] UI container serves the placeholder home page on port 8080
+- [x] `docker-compose.yml` exists at repo root
+- [x] `proxy` service uses `src/Schleusenwerk/Dockerfile`, mounts `/var/run/docker.sock`, a named volume for SQLite (`db:/data`), and a named volume for certificates (`certs:/certs`); exposes ports 80, 443, 5000
+- [x] `ui` service uses `src/Schleusenwerk.UI/Dockerfile`, exposes port 8080, has `PROXY_GRPC_ENDPOINT=http://proxy:5000` env var
+- [x] Named volumes `db` and `certs` are declared
+- [~] ⚠️ BLOCKED: `docker compose up` starts both containers without errors — Docker is not available in this environment
+- [~] ⚠️ BLOCKED: Proxy container logs show Akka actor system started — Docker is not available in this environment
+- [~] ⚠️ BLOCKED: UI container serves the placeholder home page on port 8080 — Docker is not available in this environment
 
 ---
 

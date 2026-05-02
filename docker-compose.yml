@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: src/Schleusenwerk/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+      - "5000:5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - db:/data
+      - certs:/certs
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - schleusenwerk
+
+  ui:
+    build:
+      context: .
+      dockerfile: src/Schleusenwerk.UI/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - PROXY_GRPC_ENDPOINT=http://proxy:5000
+    networks:
+      - schleusenwerk
+    depends_on:
+      - proxy
+
+volumes:
+  db:
+  certs:
+
+networks:
+  schleusenwerk:
+    driver: bridge

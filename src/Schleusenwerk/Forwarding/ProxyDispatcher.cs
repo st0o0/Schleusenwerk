@@ -4,35 +4,27 @@ using Schleusenwerk.Routing;
 
 namespace Schleusenwerk.Forwarding;
 
-/// <summary>
-/// ASP.NET Core middleware that orchestrates the full proxy pipeline:
-/// host resolution via DomainRouterActor, request forwarding via TurboHTTP,
-/// and response header manipulation.
-/// </summary>
-internal sealed class ProxyRequestHandler
+internal sealed class ProxyDispatcher : IProxyDispatcher
 {
-    private readonly RequestDelegate _next;
     private readonly IActorRef _domainRouter;
-    private readonly RequestForwardingPipeline _forwardingPipeline;
+    private readonly RequestForwardingPipeline _pipeline;
     private readonly HeaderManipulationFilter _headerFilter;
     private readonly WebSocketTunnel _webSocketTunnel;
     private static readonly TimeSpan AskTimeout = TimeSpan.FromSeconds(5);
 
-    public ProxyRequestHandler(
-        RequestDelegate next,
+    public ProxyDispatcher(
         IRequiredActor<DomainRouterActor> domainRouterProvider,
-        RequestForwardingPipeline forwardingPipeline,
+        RequestForwardingPipeline pipeline,
         HeaderManipulationFilter headerFilter,
         WebSocketTunnel webSocketTunnel)
     {
-        _next = next;
         _domainRouter = domainRouterProvider.ActorRef;
-        _forwardingPipeline = forwardingPipeline;
+        _pipeline = pipeline;
         _headerFilter = headerFilter;
         _webSocketTunnel = webSocketTunnel;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task HandleAsync(HttpContext context, CancellationToken ct)
     {
         var host = context.Request.Host.Host;
 
@@ -45,12 +37,12 @@ internal sealed class ProxyRequestHandler
         var response = await _domainRouter.Ask<object>(
             new ResolveUpstream(host),
             AskTimeout,
-            context.RequestAborted);
+            ct);
 
         switch (response)
         {
             case UpstreamResolved resolved:
-                await HandleResolvedRoute(context, resolved.Target, resolved.Config);
+                await HandleResolvedRoute(context, resolved.Target, resolved.Config, ct);
                 break;
 
             case UpstreamNotFound:
@@ -63,7 +55,11 @@ internal sealed class ProxyRequestHandler
         }
     }
 
-    private async Task HandleResolvedRoute(HttpContext context, UpstreamTarget upstream, DomainConfig config)
+    private async Task HandleResolvedRoute(
+        HttpContext context,
+        UpstreamTarget upstream,
+        DomainConfig config,
+        CancellationToken ct)
     {
         if (ShouldRedirectToHttps(context, config))
         {
@@ -73,11 +69,11 @@ internal sealed class ProxyRequestHandler
 
         if (WebSocketTunnel.IsWebSocketUpgrade(context.Request))
         {
-            await _webSocketTunnel.TunnelAsync(context, upstream, config, context.RequestAborted);
+            await _webSocketTunnel.TunnelAsync(context, upstream, config, ct);
             return;
         }
 
-        await _forwardingPipeline.ForwardAsync(context, upstream, config, _headerFilter);
+        await _pipeline.ForwardAsync(context, upstream, config, _headerFilter);
     }
 
     private static bool ShouldRedirectToHttps(HttpContext context, DomainConfig config)
@@ -91,16 +87,7 @@ internal sealed class ProxyRequestHandler
     {
         var request = context.Request;
         var httpsUrl = $"https://{request.Host}{request.PathBase}{request.Path}{request.QueryString}";
-
         context.Response.StatusCode = (int)config.HttpRedirect;
         context.Response.Headers.Location = httpsUrl;
-    }
-}
-
-internal static class ProxyRequestHandlerExtensions
-{
-    public static IApplicationBuilder UseProxyRequestHandler(this IApplicationBuilder app)
-    {
-        return app.UseMiddleware<ProxyRequestHandler>();
     }
 }

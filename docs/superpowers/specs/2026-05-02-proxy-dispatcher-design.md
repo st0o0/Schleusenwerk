@@ -91,7 +91,7 @@ Client Request
 ### Unit Tests
 
 - `ProxyDispatcher`: mock `IDomainRouterActor`, mock `IUpstreamSelector`, mock `RequestForwardingPipeline` — verify dispatch logic (WebSocket vs HTTP, 502 on no route)
-- `UpstreamSelector`: pure logic test — assert round-robin distribution, assert unhealthy upstreams are skipped
+- `UpstreamSelector`: pure logic test — assert round-robin distribution over the upstreams in the `RouteDefinition` (health filtering is `DomainRouterActor`'s responsibility, not `UpstreamSelector`'s)
 
 ### Integration Tests
 

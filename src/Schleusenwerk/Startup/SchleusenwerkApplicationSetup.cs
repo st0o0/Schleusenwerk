@@ -13,7 +13,9 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
 
         app.Use(HttpsRedirectionMiddleware);
         app.UseWebSockets();
-        app.UseProxyRequestHandler();
+
+        app.MapFallback(async (HttpContext ctx, IProxyDispatcher dispatcher, CancellationToken ct) =>
+            await dispatcher.HandleAsync(ctx, ct));
     }
 
     private static async Task HttpsRedirectionMiddleware(HttpContext context, RequestDelegate next)

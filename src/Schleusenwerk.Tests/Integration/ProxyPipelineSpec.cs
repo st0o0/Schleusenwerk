@@ -141,11 +141,18 @@ public sealed class ProxyPipelineSpec : IAsyncLifetime
                     services.AddSingleton<RequestForwardingPipeline>();
                     services.AddSingleton<HeaderManipulationFilter>();
                     services.AddSingleton<WebSocketTunnel>();
+                    services.AddSingleton<IProxyDispatcher, ProxyDispatcher>();
+                    services.AddRouting();
                 });
                 web.Configure(app =>
                 {
                     app.UseWebSockets();
-                    app.UseProxyRequestHandler();
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints =>
+                    {
+                        endpoints.MapFallback(async (HttpContext ctx, IProxyDispatcher dispatcher, CancellationToken ct) =>
+                            await dispatcher.HandleAsync(ctx, ct));
+                    });
                 });
             })
             .Build();

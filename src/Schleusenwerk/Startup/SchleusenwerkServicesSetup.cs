@@ -19,6 +19,7 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         services.AddSingleton<RequestForwardingPipeline>();
         services.AddSingleton<HeaderManipulationFilter>();
         services.AddSingleton<WebSocketTunnel>();
+        services.AddSingleton<IProxyDispatcher, ProxyDispatcher>();
         services.AddSingleton<IConfigurationService, ConfigurationService>();
 
         services.Configure<KestrelServerOptions>(options =>

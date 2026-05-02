@@ -63,22 +63,83 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
 
     private void Handle(Connect msg)
     {
+        _client?.Dispose();
+        var uri = ResolveContainerEngineUri();
+
+        if (uri is null)
+        {
+            _log.Info("No container engine socket found — discovery disabled");
+            return;
+        }
+
         try
         {
-            _client?.Dispose();
-            var uri = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? new Uri("npipe:////./pipe/docker_engine")
-                : new Uri("unix:///var/run/docker.sock");
-
             _client = new DockerClientConfiguration(uri).CreateClient();
-            _log.Info("Connected to Docker socket at {Uri}", uri);
+            _log.Info("Connected to container engine at {Uri}", uri);
             Self.Tell(StartDiscovery.Instance);
         }
         catch (Exception ex)
         {
-            _log.Warning("Failed to connect to Docker socket: {Error} — retrying", ex.Message);
+            _log.Warning("Failed to connect to container engine at {Uri}: {Error} — retrying", uri, ex.Message);
             ScheduleReconnect(msg.Attempt);
         }
+    }
+
+    private static Uri? ResolveContainerEngineUri()
+    {
+        var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
+        if (!string.IsNullOrWhiteSpace(dockerHost))
+            return new Uri(dockerHost);
+
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? ResolveWindowsPipeUri()
+            : ResolveUnixSocketUri();
+    }
+
+    private static Uri? ResolveWindowsPipeUri()
+    {
+        string[] candidates = ["docker_engine", "podman-machine-default", "podman"];
+        HashSet<string> pipes;
+        try
+        {
+            pipes = new HashSet<string>(
+                Directory.GetFiles(@"\\.\pipe\").Select(Path.GetFileName)!,
+                StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return null;
+        }
+
+        foreach (var name in candidates)
+        {
+            if (pipes.Contains(name))
+                return new Uri($"npipe://./pipe/{name}");
+        }
+
+        return null;
+    }
+
+    private static Uri? ResolveUnixSocketUri()
+    {
+        var candidates = new List<string>
+        {
+            "/var/run/docker.sock",
+            "/run/podman/podman.sock",
+        };
+
+        // Rootless Podman uses XDG_RUNTIME_DIR (e.g. /run/user/1000/podman/podman.sock).
+        var xdgRuntimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (!string.IsNullOrWhiteSpace(xdgRuntimeDir))
+            candidates.Add(Path.Combine(xdgRuntimeDir, "podman", "podman.sock"));
+
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path))
+                return new Uri($"unix://{path}");
+        }
+
+        return null;
     }
 
     private void Handle(StartDiscovery _)

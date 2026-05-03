@@ -1,3 +1,5 @@
+using Akka.Actor;
+using Akka.Streams;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Schleusenwerk.Certificates;
 using Schleusenwerk.Forwarding;
@@ -36,6 +38,15 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
                 var selector = options.ApplicationServices!.GetRequiredService<SniCertificateSelector>();
                 adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
             });
+        });
+
+        services.AddGrpc();
+        services.AddSingleton<IMaterializer>(sp =>
+            sp.GetRequiredService<ActorSystem>().Materializer());
+
+        services.Configure<KestrelServerOptions>(options =>
+        {
+            options.ListenAnyIP(5000, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
         });
     }
 }

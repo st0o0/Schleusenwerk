@@ -1,0 +1,66 @@
+@page "/routes/new"
+@using Schleusenwerk.Contracts
+@inject IRouteClient RouteClient
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>New Route — Schleusenwerk</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">New Route</MudText>
+
+<MudCard Style="max-width: 600px;">
+    <MudCardContent>
+        <MudTextField @bind-Value="_domain" Label="Domain" Required="true"
+                      Placeholder="example.com" Class="mb-3" />
+        <MudTextField @bind-Value="_firstUpstreamUrl" Label="Upstream URL" Required="true"
+                      Placeholder="http://backend:8080" Class="mb-3" />
+        <MudSwitch @bind-Value="_forceHttps" Label="Force HTTPS" Color="Color.Primary" Class="mb-3" />
+        <MudSlider @bind-Value="_timeoutSeconds" Min="5" Max="300" Step="5"
+                   Label="@($"Timeout: {_timeoutSeconds}s")" Class="mb-3" />
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SubmitAsync" Disabled="_submitting">
+            @if (_submitting) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <span>Create</span> }
+        </MudButton>
+        <MudButton Href="/routes">Cancel</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private string _domain = "";
+    private string _firstUpstreamUrl = "";
+    private bool _forceHttps;
+    private int _timeoutSeconds = 30;
+    private bool _submitting;
+
+    private async Task SubmitAsync()
+    {
+        _submitting = true;
+        try
+        {
+            var result = await RouteClient.AddRouteAsync(new AddRouteRequest
+            {
+                Domain = _domain,
+                ForceHttps = _forceHttps,
+                TimeoutSeconds = _timeoutSeconds,
+                FirstUpstreamUrl = _firstUpstreamUrl
+            });
+
+            if (result.Success)
+            {
+                Nav.NavigateTo("/routes");
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage, Severity.Error);
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

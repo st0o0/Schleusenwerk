@@ -1,0 +1,128 @@
+@page "/routes/{domain}"
+@using Schleusenwerk.Contracts
+@inject IRouteClient RouteClient
+@inject ISnackbar Snackbar
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>@Domain — Schleusenwerk</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_detail is null)
+{
+    <MudAlert Severity="Severity.Error">Route not found.</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h5" Class="mb-4">@Domain</MudText>
+
+    <MudCard Class="mb-4" Style="max-width: 600px;">
+        <MudCardHeader><MudText Typo="Typo.h6">Configuration</MudText></MudCardHeader>
+        <MudCardContent>
+            <MudSwitch @bind-Value="_forceHttps" Label="Force HTTPS" Color="Color.Primary" />
+            <MudSlider @bind-Value="_timeoutSeconds" Min="5" Max="300" Step="5"
+                       Label="@($"Timeout: {_timeoutSeconds}s")" Class="mt-2" />
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveConfigAsync">
+                Save
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+
+    <MudText Typo="Typo.h6" Class="mb-2">Upstreams</MudText>
+    <MudTable Items="_detail.Upstreams" Dense="true" Class="mb-4">
+        <HeaderContent>
+            <MudTh>URL</MudTh>
+            <MudTh>Weight</MudTh>
+            <MudTh>Health</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Url</MudTd>
+            <MudTd>@context.Weight</MudTd>
+            <MudTd>
+                <HealthIndicator IsHealthy="@IsUpstreamHealthy(context.Url)" />
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => RemoveUpstreamAsync(context.Url))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    <MudStack Row="true" Spacing="2">
+        <MudTextField @bind-Value="_newUpstreamUrl" Label="New Upstream URL"
+                      Placeholder="http://backend:8080" Style="max-width: 400px;" />
+        <MudButton Variant="Variant.Outlined" OnClick="AddUpstreamAsync">Add</MudButton>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public string Domain { get; set; } = "";
+
+    private Schleusenwerk.Contracts.RouteDetail? _detail;
+    private bool _loading = true;
+    private bool _forceHttps;
+    private int _timeoutSeconds = 30;
+    private string _newUpstreamUrl = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _detail = await RouteClient.GetRouteAsync(Domain);
+            _forceHttps = _detail.ForceHttps;
+            _timeoutSeconds = _detail.TimeoutSeconds > 0 ? _detail.TimeoutSeconds : 30;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool IsUpstreamHealthy(string url) =>
+        _detail?.Health.FirstOrDefault(h => h.Url == url)?.IsHealthy ?? true;
+
+    private async Task SaveConfigAsync()
+    {
+        var result = await RouteClient.UpdateRouteAsync(new UpdateRouteRequest
+        {
+            Domain = Domain,
+            ForceHttps = _forceHttps,
+            TimeoutSeconds = _timeoutSeconds
+        });
+        Snackbar.Add(result.Success ? "Saved" : result.ErrorMessage,
+            result.Success ? Severity.Success : Severity.Error);
+    }
+
+    private async Task AddUpstreamAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newUpstreamUrl)) return;
+        var result = await RouteClient.AddUpstreamAsync(Domain, _newUpstreamUrl);
+        if (result.Success)
+        {
+            _newUpstreamUrl = "";
+            _detail = await RouteClient.GetRouteAsync(Domain);
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage, Severity.Error);
+        }
+    }
+
+    private async Task RemoveUpstreamAsync(string url)
+    {
+        var result = await RouteClient.RemoveUpstreamAsync(Domain, url);
+        if (result.Success)
+        {
+            _detail = await RouteClient.GetRouteAsync(Domain);
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage, Severity.Error);
+        }
+    }
+}

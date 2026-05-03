@@ -1,0 +1,38 @@
+syntax = "proto3";
+option csharp_namespace = "Schleusenwerk.Contracts";
+import "google/protobuf/empty.proto";
+import "Protos/common.proto";
+
+service CertificateService {
+  rpc ListCertificates (google.protobuf.Empty) returns (ListCertificatesResponse);
+  rpc GetCertificate (GetCertificateRequest) returns (CertificateDetail);
+  rpc ProvisionCertificate (ProvisionCertificateRequest) returns (CommandResult);
+}
+
+message ListCertificatesResponse {
+  repeated CertificateSummary certificates = 1;
+}
+
+message CertificateSummary {
+  string domain = 1;
+  string thumbprint = 2;
+  string not_after = 3;
+  bool is_self_signed = 4;
+}
+
+message GetCertificateRequest {
+  string domain = 1;
+}
+
+message CertificateDetail {
+  string domain = 1;
+  string thumbprint = 2;
+  string not_before = 3;
+  string not_after = 4;
+  string issuer = 5;
+  bool is_self_signed = 6;
+}
+
+message ProvisionCertificateRequest {
+  string domain = 1;
+}

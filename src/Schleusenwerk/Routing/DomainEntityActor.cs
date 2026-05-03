@@ -109,6 +109,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         Command<AddUpstream>(HandleAddUpstream);
         Command<RemoveUpstream>(HandleRemoveUpstream);
         Command<GetDomainConfig>(_ => HandleGetConfig());
+        Command<GetDomainUpstreamHealth>(_ => HandleGetUpstreamHealth());
         Command<ResolveUpstream>(HandleResolveUpstream);
         Command<UpstreamHealthChanged>(msg =>
         {
@@ -232,6 +233,14 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         }
 
         Sender.Tell(new DomainConfigResult(_config, _upstreamTargets));
+    }
+
+    private void HandleGetUpstreamHealth()
+    {
+        var entries = _upstreamTargets
+            .Select(t => new UpstreamHealthStatus(t.Url, !_unhealthyUrls.Contains(t.Url)))
+            .ToList();
+        Sender.Tell(new DomainUpstreamHealthResult(entries));
     }
 
     private void HandleResolveUpstream(ResolveUpstream msg)

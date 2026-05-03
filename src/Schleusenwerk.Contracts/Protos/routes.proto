@@ -1,0 +1,72 @@
+syntax = "proto3";
+option csharp_namespace = "Schleusenwerk.Contracts";
+import "google/protobuf/empty.proto";
+import "Protos/common.proto";
+
+service RouteService {
+  rpc ListRoutes (google.protobuf.Empty) returns (ListRoutesResponse);
+  rpc GetRoute (GetRouteRequest) returns (RouteDetail);
+  rpc AddRoute (AddRouteRequest) returns (CommandResult);
+  rpc UpdateRoute (UpdateRouteRequest) returns (CommandResult);
+  rpc DeleteRoute (DeleteRouteRequest) returns (CommandResult);
+  rpc AddUpstream (AddUpstreamRequest) returns (CommandResult);
+  rpc RemoveUpstream (RemoveUpstreamRequest) returns (CommandResult);
+}
+
+message ListRoutesResponse {
+  repeated RouteSummary routes = 1;
+}
+
+message RouteSummary {
+  string domain = 1;
+  bool force_https = 2;
+  string source = 3;
+  int32 timeout_seconds = 4;
+  repeated UpstreamInfo upstreams = 5;
+}
+
+message UpstreamInfo {
+  string url = 1;
+  int32 weight = 2;
+}
+
+message GetRouteRequest {
+  string domain = 1;
+}
+
+message RouteDetail {
+  string domain = 1;
+  bool force_https = 2;
+  int32 timeout_seconds = 3;
+  string source = 4;
+  repeated UpstreamInfo upstreams = 5;
+  repeated UpstreamHealthEntry health = 6;
+}
+
+message AddRouteRequest {
+  string domain = 1;
+  bool force_https = 2;
+  int32 timeout_seconds = 3;
+  string first_upstream_url = 4;
+}
+
+message UpdateRouteRequest {
+  string domain = 1;
+  bool force_https = 2;
+  int32 timeout_seconds = 3;
+}
+
+message DeleteRouteRequest {
+  string domain = 1;
+}
+
+message AddUpstreamRequest {
+  string domain = 1;
+  string url = 2;
+  int32 weight = 3;
+}
+
+message RemoveUpstreamRequest {
+  string domain = 1;
+  string url = 2;
+}

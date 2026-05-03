@@ -1,5 +1,25 @@
 @inherits LayoutComponentBase
 
-<main>
-    @Body
-</main>
+<MudThemeProvider />
+<MudSnackbarProvider />
+<MudDialogProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@(_ => _drawerOpen = !_drawerOpen)" />
+        <MudText Typo="Typo.h6" Class="ml-3">Schleusenwerk</MudText>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+}

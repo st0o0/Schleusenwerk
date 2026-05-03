@@ -63,3 +63,12 @@ public sealed record GetDomainConfig : IWithDomain
 {
     public required string Domain { get; init; }
 }
+
+public sealed record GetDomainUpstreamHealth : IWithDomain
+{
+    public required string Domain { get; init; }
+}
+
+public sealed record UpstreamHealthStatus(UpstreamUrl Url, bool IsHealthy);
+
+public sealed record DomainUpstreamHealthResult(IReadOnlyList<UpstreamHealthStatus> Entries);

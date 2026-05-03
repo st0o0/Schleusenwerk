@@ -9,10 +9,15 @@
         <PackageReference Include="TurboHTTP" />
         <PackageReference Include="Servus.Akka" />
         <PackageReference Include="Servus.Core" />
+        <PackageReference Include="Grpc.AspNetCore" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Schleusenwerk.Core\Schleusenwerk.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Schleusenwerk.Contracts\Schleusenwerk.Contracts.csproj" />
     </ItemGroup>
 
     <ItemGroup>

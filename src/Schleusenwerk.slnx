@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="Schleusenwerk/Schleusenwerk.csproj" />
   <Project Path="Schleusenwerk.Core/Schleusenwerk.Core.csproj" />
+  <Project Path="Schleusenwerk.Contracts/Schleusenwerk.Contracts.csproj" />
   <Project Path="Schleusenwerk.UI/Schleusenwerk.UI.csproj" />
   <Folder Name="/Solution Items/">
     <File Path="../.dockerignore" />

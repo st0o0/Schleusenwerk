@@ -1,0 +1,83 @@
+@page "/certificates"
+@using Schleusenwerk.Contracts
+@inject ICertificateClient CertClient
+@inject ISnackbar Snackbar
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Certificates — Schleusenwerk</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Certificates</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_certs" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Domain</MudTh>
+            <MudTh>Thumbprint</MudTh>
+            <MudTh>Expires</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Domain</MudTd>
+            <MudTd>
+                <MudText Style="font-family: monospace; font-size: 0.75rem;">
+                    @context.Thumbprint[..Math.Min(12, context.Thumbprint.Length)]…
+                </MudText>
+            </MudTd>
+            <MudTd>
+                @if (DateTime.TryParse(context.NotAfter, out var expiry))
+                {
+                    <MudText Color="@(expiry < DateTime.UtcNow.AddDays(14) ? Color.Warning : Color.Default)">
+                        @expiry.ToString("yyyy-MM-dd")
+                    </MudText>
+                }
+            </MudTd>
+            <MudTd>
+                @if (context.IsSelfSigned)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Self-Signed</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">ACME</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                           OnClick="@(() => RenewAsync(context.Domain))">
+                    Renew
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<CertificateSummary> _certs = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _certs = (await CertClient.ListCertificatesAsync()).ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RenewAsync(string domain)
+    {
+        var result = await CertClient.ProvisionCertificateAsync(domain);
+        Snackbar.Add(
+            result.Success ? $"Provisioning triggered for {domain}" : result.ErrorMessage,
+            result.Success ? Severity.Info : Severity.Error);
+    }
+}

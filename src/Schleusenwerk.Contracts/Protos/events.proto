@@ -1,0 +1,27 @@
+syntax = "proto3";
+option csharp_namespace = "Schleusenwerk.Contracts";
+
+service EventService {
+  rpc Subscribe (SubscribeRequest) returns (stream ProxyEvent);
+}
+
+message SubscribeRequest {
+  string filter = 1;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  ROUTE_UPDATED = 1;
+  ROUTE_REMOVED = 2;
+  UPSTREAM_HEALTH_CHANGED = 3;
+  CERTIFICATE_PROVISIONED = 4;
+  CERTIFICATE_EXPIRING = 5;
+}
+
+message ProxyEvent {
+  EventType type = 1;
+  string domain = 2;
+  string message = 3;
+  bool is_healthy = 4;
+  string upstream_url = 5;
+}

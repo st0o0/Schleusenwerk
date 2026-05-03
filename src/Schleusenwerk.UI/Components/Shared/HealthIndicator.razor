@@ -1,0 +1,12 @@
+@if (IsHealthy)
+{
+    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success" Size="Size.Small" Title="Healthy" />
+}
+else
+{
+    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Error" Size="Size.Small" Title="Unhealthy" />
+}
+
+@code {
+    [Parameter, EditorRequired] public bool IsHealthy { get; set; }
+}

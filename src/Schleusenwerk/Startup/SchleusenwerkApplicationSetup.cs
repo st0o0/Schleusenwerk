@@ -9,6 +9,11 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
     {
         app.MapGet("/health", () => Results.Ok("healthy"));
 
+        app.MapGrpcService<Grpc.RouteServiceImpl>();
+        app.MapGrpcService<Grpc.CertificateServiceImpl>();
+        app.MapGrpcService<Grpc.HealthServiceImpl>();
+        app.MapGrpcService<Grpc.EventServiceImpl>();
+
         app.Use(HttpsRedirectionMiddleware);
         app.UseWebSockets();
 

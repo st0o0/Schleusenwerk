@@ -1,0 +1,69 @@
+@page "/"
+@inject IHealthClient HealthClient
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Dashboard — Schleusenwerk</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Dashboard</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Routes</MudText>
+                    <MudText Typo="Typo.h4">@_health!.RouteCount</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Healthy</MudText>
+                    <MudText Typo="Typo.h4" Color="Color.Success">@_health!.HealthyCount</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Unhealthy</MudText>
+                    <MudText Typo="Typo.h4" Color="@(_health!.UnhealthyCount > 0 ? Color.Error : Color.Default)">
+                        @_health!.UnhealthyCount
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private ProxyHealthResponse? _health;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _health = await HealthClient.GetHealthAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not reach proxy: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

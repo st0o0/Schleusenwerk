@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: src/Schleusenwerk/Dockerfile
     ports:
-      - "80:80"
-      - "443:443"
+      - "1312:80"
+      - "1313:443"
       - "5000:5000"
     volumes:
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
@@ -26,7 +26,7 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - PROXY_GRPC_ENDPOINT=http://proxy:5000
+      - PROXY_GRPC_ENDPOINT=https://proxy:5000
     networks:
       - schleusenwerk
     depends_on:

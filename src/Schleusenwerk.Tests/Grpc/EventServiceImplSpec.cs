@@ -42,7 +42,7 @@ public sealed class EventServiceImplSpec : TestKit
 
         var subscribeTask = sut.Subscribe(request, mockStream, new TestServerCallContext(cts.Token));
 
-        await Task.Delay(50);
+        await Task.Delay(500);
 
         eventHub.Tell(new DomainConfigured(new DomainConfig
         {
@@ -51,14 +51,7 @@ public sealed class EventServiceImplSpec : TestKit
             RequestTimeout = TimeSpan.FromSeconds(30)
         }));
 
-        try
-        {
-            await tcs.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        }
-        catch (TimeoutException)
-        {
-            // Event may take time to process
-        }
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(3));
 
         Assert.Single(receivedEvents);
         Assert.Equal(EventType.RouteUpdated, receivedEvents[0].Type);
@@ -81,7 +74,7 @@ public sealed class EventServiceImplSpec : TestKit
 
         var subscribeTask = sut.Subscribe(request, mockStream, new TestServerCallContext(cts.Token));
 
-        await Task.Delay(50);
+        await Task.Delay(500);
 
         eventHub.Tell(new DomainConfigured(new DomainConfig
         {
@@ -97,7 +90,7 @@ public sealed class EventServiceImplSpec : TestKit
             RequestTimeout = TimeSpan.FromSeconds(30)
         }));
 
-        await Task.Delay(200);
+        await Task.Delay(1000);
 
         Assert.Single(receivedEvents);
         Assert.Equal("example.com", receivedEvents[0].Domain);
@@ -119,7 +112,7 @@ public sealed class EventServiceImplSpec : TestKit
 
         var subscribeTask = sut.Subscribe(request, mockStream, new TestServerCallContext(cts.Token));
 
-        await Task.Delay(50);
+        await Task.Delay(500);
 
         eventHub.Tell(new DomainConfigured(new DomainConfig
         {
@@ -130,7 +123,7 @@ public sealed class EventServiceImplSpec : TestKit
 
         eventHub.Tell(new DomainDeactivated(DomainName.Parse("other.com")));
 
-        await Task.Delay(200);
+        await Task.Delay(1000);
 
         Assert.Equal(2, receivedEvents.Count);
         Assert.Equal(EventType.RouteUpdated, receivedEvents[0].Type);

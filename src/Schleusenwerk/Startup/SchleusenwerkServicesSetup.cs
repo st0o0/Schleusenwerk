@@ -43,10 +43,5 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         services.AddGrpc();
         services.AddSingleton<IMaterializer>(sp =>
             sp.GetRequiredService<ActorSystem>().Materializer());
-
-        services.Configure<KestrelServerOptions>(options =>
-        {
-            options.ListenAnyIP(5000, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2);
-        });
     }
 }

@@ -85,8 +85,8 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
                 _upstreamRegion.Tell(new RegisterUpstream(upstream));
             }
 
-            Stash.UnstashAll();
             Become(Ready);
+            Stash.UnstashAll();
         });
         Command<Status.Failure>(f =>
         {
@@ -122,6 +122,21 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
                 _unhealthyUrls.Add(msg.Url);
             }
         });
+        Command<Status.Failure>(f =>
+        {
+            _log.Warning(f.Cause, "Stream or async operation failed");
+        });
+        Command<StreamCompleted>(_ => { });
+        Command<StreamFailed>(f =>
+        {
+            _log.Warning(f.Ex, "Event subscription stream failed");
+        });
+        Command<PublishDropped>(_ => { });
+        Command<PublishFailed>(f =>
+        {
+            _log.Warning(f.Exception, "Failed to publish event to hub");
+        });
+        Command<IDomainEvent>(_ => { });
     }
 
     private void HandleAddDomain(AddDomain cmd)

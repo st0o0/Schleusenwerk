@@ -17,7 +17,7 @@ WORKDIR /app
 COPY --from=build /app .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80;https://+:443;grpc://+:5000
+ENV ASPNETCORE_URLS=http://+:80;https://+:443
 
 EXPOSE 80 443 5000
 

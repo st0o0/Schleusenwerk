@@ -1,3 +1,4 @@
+using Akka;
 using Akka.Actor;
 using Akka.Event;
 using Akka.Persistence;
@@ -9,27 +10,14 @@ using Servus.Akka;
 
 namespace Schleusenwerk.Routing;
 
-/// <summary>
-/// Persistent aggregate root for a single domain.
-/// Handles domain configuration and upstream management via commands,
-/// persists events, and publishes to EventHub.
-/// States: WaitingForPublisher → Ready.
-/// </summary>
 public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedStash
 {
-    public override string PersistenceId
-    {
-        get
-        {
-            var name = Self.Path.Name;
-            return $"domain-{name}";
-        }
-    }
+    public override string PersistenceId => $"domain-{Self.Path.Name}";
 
     public new IStash Stash { get; set; } = null!;
 
     private readonly ILoggingAdapter _log = Context.GetLogger();
-    private readonly IActorRef _upstreamRegion;
+    private readonly IActorRef _healthCheckRegion;
     private readonly IActorRef _eventHub;
     private readonly IConfigurationStore _configStore;
     private IMaterializer _materializer = null!;
@@ -38,12 +26,13 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     private DomainConfig? _config;
     private readonly List<UpstreamTarget> _upstreamTargets = [];
     private readonly HashSet<UpstreamUrl> _unhealthyUrls = [];
+    private readonly Dictionary<UpstreamUrl, UpstreamCircuitState> _circuitStates = new();
     private int _roundRobinIndex;
 
     public DomainEntityActor(IConfigurationStore configStore)
     {
         _configStore = configStore;
-        _upstreamRegion = Context.GetActor<UpstreamEntityActor>();
+        _healthCheckRegion = Context.GetActor<HealthCheckEntityActor>();
         _eventHub = Context.GetActor<EventHub>();
 
         Recover<DomainConfigured>(evt => _config = evt.Config);
@@ -67,6 +56,16 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             .PipeTo(Self);
     }
 
+    private UpstreamCircuitState GetCircuitState(UpstreamUrl url)
+    {
+        if (!_circuitStates.TryGetValue(url, out var state))
+        {
+            state = new UpstreamCircuitState(url, TimeSpan.FromSeconds(30));
+            _circuitStates[url] = state;
+        }
+        return state;
+    }
+
     private void WaitingForPublisher()
     {
         Command<EventHub.PublisherReady>(msg =>
@@ -79,11 +78,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             _eventHub.Ask<EventHub.Subscribed>(EventHub.Subscribe<IDomainEvent>.Instance)
                 .PipeTo(Self);
 
-            // Send RegisterUpstream for all recovered upstreams
-            foreach (var upstream in _upstreamTargets)
-            {
-                _upstreamRegion.Tell(new RegisterUpstream(upstream));
-            }
+            SubscribeToHealthChecks();
 
             Become(Ready);
             Stash.UnstashAll();
@@ -111,15 +106,30 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         Command<GetDomainConfig>(_ => HandleGetConfig());
         Command<GetDomainUpstreamHealth>(_ => HandleGetUpstreamHealth());
         Command<ResolveUpstream>(HandleResolveUpstream);
+        Command<RequestFailed>(msg =>
+        {
+            var state = GetCircuitState(msg.Url);
+            state.RecordFailure();
+        });
+        Command<RequestSucceeded>(msg =>
+        {
+            var state = GetCircuitState(msg.Url);
+            state.RecordSuccess();
+        });
         Command<UpstreamHealthChanged>(msg =>
         {
             if (msg.IsHealthy)
             {
                 _unhealthyUrls.Remove(msg.Url);
+                if (_circuitStates.TryGetValue(msg.Url, out var state))
+                {
+                    state.ForceClose();
+                }
             }
             else
             {
                 _unhealthyUrls.Add(msg.Url);
+                GetCircuitState(msg.Url).ForceOpen();
             }
         });
         Command<Status.Failure>(f =>
@@ -137,6 +147,14 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             _log.Warning(f.Exception, "Failed to publish event to hub");
         });
         Command<IDomainEvent>(_ => { });
+    }
+
+    private void SubscribeToHealthChecks()
+    {
+        foreach (var upstream in _upstreamTargets)
+        {
+            _healthCheckRegion.Tell(new SubscribeHealth(Self) { Url = upstream.Url.Value.ToString() });
+        }
     }
 
     private void HandleAddDomain(AddDomain cmd)
@@ -184,11 +202,17 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             return;
         }
 
+        foreach (var upstream in _upstreamTargets)
+        {
+            _healthCheckRegion.Tell(new UnsubscribeHealth(Self) { Url = upstream.Url.Value.ToString() });
+        }
+
         var evt = new DomainDeactivated(cmd.DomainName);
         Persist(evt, persisted =>
         {
             _config = null;
             _upstreamTargets.Clear();
+            _circuitStates.Clear();
             _configStore.RemoveDomainAsync(cmd.DomainName);
             PublishEvent(persisted);
             Context.System.EventStream.Publish(new RouteRemoved(cmd.DomainName));
@@ -215,7 +239,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         Persist(evt, persisted =>
         {
             _upstreamTargets.Add(persisted.Target);
-            _upstreamRegion.Tell(new RegisterUpstream(persisted.Target));
+            _healthCheckRegion.Tell(new SubscribeHealth(Self) { Url = persisted.Target.Url.Value.ToString() });
             PublishEvent(persisted);
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
@@ -234,6 +258,8 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         {
             _upstreamTargets.RemoveAll(t => t.Url.Equals(persisted.Url));
             _unhealthyUrls.Remove(persisted.Url);
+            _circuitStates.Remove(persisted.Url);
+            _healthCheckRegion.Tell(new UnsubscribeHealth(Self) { Url = persisted.Url.Value.ToString() });
             PublishEvent(persisted);
             Sender.Tell(ConfigurationCommandAck.Instance);
         });
@@ -266,14 +292,17 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             return;
         }
 
-        var healthy = _upstreamTargets.Where(u => !_unhealthyUrls.Contains(u.Url)).ToList();
-        if (healthy.Count == 0)
+        var available = _upstreamTargets
+            .Where(u => !_unhealthyUrls.Contains(u.Url) && GetCircuitState(u.Url).IsAvailable)
+            .ToList();
+
+        if (available.Count == 0)
         {
             Sender.Tell(new UpstreamNotFound(msg.Host));
             return;
         }
 
-        var picked = healthy[_roundRobinIndex % healthy.Count];
+        var picked = available[_roundRobinIndex % available.Count];
         _roundRobinIndex++;
         Sender.Tell(new UpstreamResolved(picked, _config));
     }
@@ -283,7 +312,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         _publishQueue?.OfferAsync(evt).PipeTo(Self,
             success: r => r is QueueOfferResult.Dropped
                 ? new PublishDropped(evt)
-                : Akka.Done.Instance,
+                : Done.Instance,
             failure: ex => new PublishFailed(ex));
     }
 

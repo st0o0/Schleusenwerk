@@ -4,14 +4,13 @@ var nginx = builder.AddContainer("upstream-mock", "nginx", "alpine")
     .WithBindMount("./nginx.conf", "/etc/nginx/nginx.conf", isReadOnly: true)
     .WithHttpEndpoint(targetPort: 80, name: "http");
 
-var proxy = builder.AddDockerfile("proxy", "../../", "src/Schleusenwerk/Dockerfile")
-    .WithHttpEndpoint(targetPort: 80, name: "http")
-    .WithHttpsEndpoint(targetPort: 5000, name: "grpc")
-    .WithVolume("proxy-data", "/data")
+var proxy = builder.AddProject<Projects.Schleusenwerk>("proxy")
+    .WithHttpEndpoint(name: "http")
+    .WithHttpsEndpoint(name: "grpc")
     .WaitFor(nginx);
 
-builder.AddDockerfile("ui", "../../", "src/Schleusenwerk.UI/Dockerfile")
-    .WithHttpEndpoint(targetPort: 8080, name: "http")
+builder.AddProject<Projects.Schleusenwerk_UI>("ui")
+    .WithHttpEndpoint(name: "http")
     .WithEnvironment("PROXY_GRPC_ENDPOINT", proxy.GetEndpoint("grpc"))
     .WaitFor(proxy);
 

@@ -10,4 +10,9 @@
         <PackageReference Include="Aspire.Dashboard.Sdk.win-x64" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\Schleusenwerk\Schleusenwerk.csproj" IsAspireProjectResource="true" />
+        <ProjectReference Include="..\Schleusenwerk.UI\Schleusenwerk.UI.csproj" IsAspireProjectResource="true" />
+    </ItemGroup>
+
 </Project>

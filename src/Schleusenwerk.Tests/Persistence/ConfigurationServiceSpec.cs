@@ -21,8 +21,8 @@ public sealed class ConfigurationServiceSpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-svc-{id}");
         registry.Register<EventHub>(hub, overwrite: true);
 
-        var upstreamProbe = CreateTestProbe();
-        registry.Register<UpstreamEntityActor>(upstreamProbe, overwrite: true);
+        var healthCheckProbe = CreateTestProbe();
+        registry.Register<HealthCheckEntityActor>(healthCheckProbe, overwrite: true);
 
         var store = new SqliteConfigurationStore(
             $"Data Source=test-svc-{id}-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");

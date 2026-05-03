@@ -13,7 +13,7 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
     private int _actorCounter;
 
-    private (IActorRef entity, IActorRef upstreamProbe) CreateEntity()
+    private (IActorRef entity, IActorRef healthCheckProbe) CreateEntity()
     {
         var id = Interlocked.Increment(ref _actorCounter);
         var registry = ActorRegistry.For(Sys);
@@ -21,14 +21,14 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-{id}");
         registry.Register<EventHub>(hub, overwrite: true);
 
-        var upstreamProbe = CreateTestProbe();
-        registry.Register<UpstreamEntityActor>(upstreamProbe, overwrite: true);
+        var healthCheckProbe = CreateTestProbe();
+        registry.Register<HealthCheckEntityActor>(healthCheckProbe, overwrite: true);
 
         var store = new SqliteConfigurationStore($"Data Source=test-{id}-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         var entity = Sys.ActorOf(
             Props.Create(() => new DomainEntityActor(store)),
             $"domain-{id:D4}");
-        return (entity, upstreamProbe);
+        return (entity, healthCheckProbe);
     }
 
     private static DomainConfig CreateDomainConfig(string domain)

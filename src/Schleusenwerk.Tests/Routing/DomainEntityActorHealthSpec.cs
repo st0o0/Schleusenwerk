@@ -18,8 +18,8 @@ public sealed class DomainEntityActorHealthSpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-health-{Guid.NewGuid():N}");
         registry.Register<EventHub>(hub, overwrite: true);
 
-        var upstreamProbe = CreateTestProbe();
-        registry.Register<UpstreamEntityActor>(upstreamProbe, overwrite: true);
+        var healthCheckProbe = CreateTestProbe();
+        registry.Register<HealthCheckEntityActor>(healthCheckProbe, overwrite: true);
 
         var store = new SqliteConfigurationStore(
             $"Data Source=health-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");

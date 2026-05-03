@@ -1,4 +1,5 @@
 using Schleusenwerk.Forwarding;
+using Schleusenwerk.RateLimiting;
 using Servus.Core.Application.Startup;
 
 namespace Schleusenwerk.Startup;
@@ -16,9 +17,11 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
 
         app.Use(HttpsRedirectionMiddleware);
         app.UseWebSockets();
+        app.UseRateLimiter();
 
         app.MapFallback(async (HttpContext ctx, IProxyDispatcher dispatcher, CancellationToken ct) =>
-            await dispatcher.HandleAsync(ctx, ct));
+            await dispatcher.HandleAsync(ctx, ct))
+            .RequireRateLimiting(DomainRateLimitPolicy.PolicyName);
     }
 
     private static async Task HttpsRedirectionMiddleware(HttpContext context, RequestDelegate next)

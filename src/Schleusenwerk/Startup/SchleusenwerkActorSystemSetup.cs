@@ -34,20 +34,9 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             SeedNodes = [$"akka.tcp://schleusenwerk@{hostname}:{port}"]
         });
 
-        var healthCheckPropsFactory = serviceProvider.GetRequiredService<IHealthCheckPropsFactory>();
         var messageExtractor = HashCodeMessageExtractor.Create(
             maxNumberOfShards: 20,
             entityIdExtractor: msg => (msg as IWithEntityId)?.EntityId);
-
-        builder.WithShardRegion<UpstreamEntityActor>(
-            "upstream-pool",
-            entityId => Props.Create(() => new UpstreamEntityActor(healthCheckPropsFactory)),
-            messageExtractor,
-            new ShardOptions
-            {
-                PassivateIdleEntityAfter = TimeSpan.FromMinutes(5),
-                RememberEntities = true
-            });
 
         var configStore = serviceProvider.GetRequiredService<IConfigurationStore>();
 
@@ -59,6 +48,23 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             {
                 PassivateIdleEntityAfter = TimeSpan.FromMinutes(5),
                 RememberEntities = true
+            });
+
+        var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+
+        builder.WithShardRegion<HealthCheckEntityActor>(
+            "health-check",
+            entityId =>
+            {
+                var url = UpstreamUrl.Parse(Uri.UnescapeDataString(entityId));
+                var target = new UpstreamTarget { Url = url };
+                return Props.Create(() => new HealthCheckEntityActor(target, httpClientFactory));
+            },
+            messageExtractor,
+            new ShardOptions
+            {
+                PassivateIdleEntityAfter = TimeSpan.FromMinutes(10),
+                RememberEntities = false
             });
 
         builder.WithActors((system, registry, resolver) =>

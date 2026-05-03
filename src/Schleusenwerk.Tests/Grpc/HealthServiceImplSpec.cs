@@ -4,6 +4,7 @@ using Akka.Persistence.TestKit;
 using Google.Protobuf.WellKnownTypes;
 using Schleusenwerk.Contracts;
 using Schleusenwerk.Grpc;
+using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
@@ -23,8 +24,8 @@ public sealed class HealthServiceImplSpec : PersistenceTestKit
         var hub = Sys.ActorOf(Props.Create<EventHub>(), $"hub-health-svc-{id}");
         registry.Register<EventHub>(hub, overwrite: true);
 
-        var upstreamProbe = CreateTestProbe();
-        registry.Register<UpstreamEntityActor>(upstreamProbe, overwrite: true);
+        var healthCheckProbe = CreateTestProbe();
+        registry.Register<HealthCheckEntityActor>(healthCheckProbe, overwrite: true);
 
         var store = new SqliteConfigurationStore(
             $"Data Source=health-svc-{id}-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");

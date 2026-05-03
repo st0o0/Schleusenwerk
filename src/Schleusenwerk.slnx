@@ -9,6 +9,7 @@
     <File Path="../.dockerignore" />
     <File Path="../.gitignore" />
     <File Path="../CLAUDE.md" />
+    <File Path="../docker-compose.yml" />
     <File Path="../README.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />

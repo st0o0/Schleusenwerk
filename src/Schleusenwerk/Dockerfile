@@ -17,8 +17,8 @@ WORKDIR /app
 COPY --from=build /app .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:80;https://+:443
+ENV ASPNETCORE_URLS=http://+:80;https://+:5000
 
-EXPOSE 80 443 5000
+EXPOSE 80 5000
 
 ENTRYPOINT ["dotnet", "Schleusenwerk.dll"]

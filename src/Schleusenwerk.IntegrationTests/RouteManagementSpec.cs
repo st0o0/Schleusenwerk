@@ -9,10 +9,12 @@ namespace Schleusenwerk.IntegrationTests;
 public sealed class RouteManagementSpec
 {
     private readonly RouteService.RouteServiceClient _routes;
+    private readonly string _upstreamUrl;
 
     public RouteManagementSpec(SchleusenwerkFixture fixture)
     {
         _routes = new RouteService.RouteServiceClient(fixture.GrpcChannel);
+        _upstreamUrl = fixture.UpstreamUrl;
     }
 
     [Fact(Timeout = 30_000)]
@@ -24,7 +26,7 @@ public sealed class RouteManagementSpec
             Domain = domain,
             ForceHttps = true,
             TimeoutSeconds = 30,
-            FirstUpstreamUrl = "http://upstream-mock"
+            FirstUpstreamUrl = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         var response = await _routes.ListRoutesAsync(new Empty(), cancellationToken: TestContext.Current.CancellationToken);
@@ -41,7 +43,7 @@ public sealed class RouteManagementSpec
             Domain = domain,
             ForceHttps = true,
             TimeoutSeconds = 60,
-            FirstUpstreamUrl = "http://upstream-mock"
+            FirstUpstreamUrl = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
@@ -105,12 +107,12 @@ public sealed class RouteManagementSpec
         await _routes.AddUpstreamAsync(new AddUpstreamRequest
         {
             Domain = domain,
-            Url = "http://upstream-mock",
+            Url = _upstreamUrl,
             Weight = 1
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Contains(detail.Upstreams, u => u.Url.Contains("upstream-mock"));
+        Assert.Contains(detail.Upstreams, u => u.Url.Contains("localhost"));
     }
 
     [Fact(Timeout = 30_000)]
@@ -122,13 +124,13 @@ public sealed class RouteManagementSpec
             Domain = domain,
             ForceHttps = false,
             TimeoutSeconds = 30,
-            FirstUpstreamUrl = "http://upstream-mock"
+            FirstUpstreamUrl = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         await _routes.RemoveUpstreamAsync(new RemoveUpstreamRequest
         {
             Domain = domain,
-            Url = "http://upstream-mock"
+            Url = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
@@ -164,12 +166,11 @@ public sealed class RouteManagementSpec
             Domain = domain,
             ForceHttps = false,
             TimeoutSeconds = 30,
-            FirstUpstreamUrl = "http://upstream-mock"
+            FirstUpstreamUrl = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Single(detail.Upstreams);
-        Assert.Contains("upstream-mock", detail.Upstreams[0].Url);
     }
 
     [Fact(Timeout = 30_000)]

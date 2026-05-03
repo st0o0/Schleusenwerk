@@ -1,10 +1,12 @@
 using Akka.Actor;
 using Akka.Streams;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Schleusenwerk.Certificates;
 using Schleusenwerk.Forwarding;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Metrics;
 using Schleusenwerk.Persistence;
+using Schleusenwerk.RateLimiting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Servus.Core.Application.Startup;
 using TurboHTTP;
 
@@ -15,8 +17,8 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
     public void SetupServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpClient();
-        services.AddSingleton<IHealthCheckPropsFactory, HealthCheckPropsFactory>();
         services.AddTurboHttpClient();
+        services.AddSingleton<ProxyMetrics>();
         services.AddSingleton<RequestForwardingPipeline>();
         services.AddSingleton<HeaderManipulationFilter>();
         services.AddSingleton<WebSocketTunnel>();
@@ -39,6 +41,10 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
                 adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
             });
         });
+
+        var rateLimitCache = new RateLimitConfigCache();
+        services.AddSingleton(rateLimitCache);
+        services.AddRateLimiter(options => options.ConfigurePolicy(rateLimitCache));
 
         services.AddGrpc();
         services.AddSingleton<IMaterializer>(sp =>

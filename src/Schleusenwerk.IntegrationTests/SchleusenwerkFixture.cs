@@ -13,6 +13,7 @@ public sealed class SchleusenwerkFixture : IAsyncLifetime
     public DistributedApplication App { get; private set; } = null!;
     public GrpcChannel GrpcChannel { get; private set; } = null!;
     public HttpClient ProxyHttp { get; private set; } = null!;
+    public string UpstreamUrl { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -38,7 +39,19 @@ public sealed class SchleusenwerkFixture : IAsyncLifetime
         });
 
         var httpEndpoint = App.GetEndpoint("proxy", "http");
-        ProxyHttp = new HttpClient { BaseAddress = httpEndpoint };
+        ProxyHttp = new HttpClient(new SocketsHttpHandler
+        {
+            SslOptions = new SslClientAuthenticationOptions
+            {
+                RemoteCertificateValidationCallback = (_, _, _, _) => true
+            }
+        })
+        {
+            BaseAddress = httpEndpoint
+        };
+
+        var upstreamEndpoint = App.GetEndpoint("upstream-mock", "http");
+        UpstreamUrl = upstreamEndpoint.ToString().TrimEnd('/');
 
         await WaitForProxyReady(cts.Token);
     }

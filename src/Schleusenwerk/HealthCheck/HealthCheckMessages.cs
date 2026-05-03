@@ -10,7 +10,7 @@ public sealed record UpstreamHealthChanged(UpstreamUrl Url, bool IsHealthy) : ID
 /// <summary>
 /// Internal tick message that triggers a health check probe.
 /// </summary>
-internal sealed record CheckHealth
+public sealed record CheckHealth
 {
     public static readonly CheckHealth Instance = new();
 }

@@ -1,3 +1,4 @@
+using Akka;
 using Akka.Actor;
 using Akka.Event;
 using Akka.Streams;
@@ -8,7 +9,7 @@ using Servus.Akka;
 
 namespace Schleusenwerk.HealthCheck;
 
-public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnboundedStash
+public sealed class HealthCheckEntityActor : ReceiveActor, IWithTimers, IWithUnboundedStash
 {
     private const string TimerKey = "health-check-tick";
 
@@ -17,6 +18,7 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
     private readonly HealthCheckConfig _config;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IActorRef _eventHub;
+    private readonly HashSet<IActorRef> _subscribers = [];
 
     private ISourceQueueWithComplete<IClusterEvent>? _publishQueue;
     private IMaterializer _materializer = null!;
@@ -28,7 +30,7 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
     public ITimerScheduler Timers { get; set; } = null!;
     public IStash Stash { get; set; } = null!;
 
-    public HealthCheckActor(UpstreamTarget target, IHttpClientFactory httpClientFactory)
+    public HealthCheckEntityActor(UpstreamTarget target, IHttpClientFactory httpClientFactory)
     {
         _target = target;
         _config = target.HealthCheck;
@@ -56,7 +58,7 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
 
             Timers.StartPeriodicTimer(TimerKey, CheckHealth.Instance, _config.Interval, _config.Interval);
 
-            _log.Info("HealthCheck publisher ready for {Url}", _target.Url);
+            _log.Info("HealthCheckEntity publisher ready for {Url}", _target.Url);
             Stash.UnstashAll();
             Become(Idle);
         });
@@ -73,6 +75,9 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
     {
         Receive<CheckHealth>(_ => OnCheckHealth());
         Receive<GetHealthStatus>(_ => OnGetHealthStatus());
+        Receive<SubscribeHealth>(OnSubscribe);
+        Receive<UnsubscribeHealth>(OnUnsubscribe);
+        Receive<Terminated>(OnTerminated);
     }
 
     private void Probing()
@@ -80,6 +85,30 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
         Receive<bool>(HandleProbeResult);
         Receive<CheckHealth>(_ => { });
         Receive<GetHealthStatus>(_ => OnGetHealthStatus());
+        Receive<SubscribeHealth>(OnSubscribe);
+        Receive<UnsubscribeHealth>(OnUnsubscribe);
+        Receive<Terminated>(OnTerminated);
+    }
+
+    private void OnSubscribe(SubscribeHealth msg)
+    {
+        if (_subscribers.Add(msg.Subscriber))
+        {
+            Context.Watch(msg.Subscriber);
+        }
+    }
+
+    private void OnUnsubscribe(UnsubscribeHealth msg)
+    {
+        if (_subscribers.Remove(msg.Subscriber))
+        {
+            Context.Unwatch(msg.Subscriber);
+        }
+    }
+
+    private void OnTerminated(Terminated msg)
+    {
+        _subscribers.Remove(msg.ActorRef);
     }
 
     private void OnCheckHealth()
@@ -120,7 +149,9 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
                 _isHealthy = true;
                 _log.Info("Upstream {Url} is now healthy after {Count} consecutive successes",
                     _target.Url, _consecutiveSuccesses);
-                PublishEvent(new UpstreamHealthChanged(_target.Url, IsHealthy: true));
+                var evt = new UpstreamHealthChanged(_target.Url, IsHealthy: true);
+                NotifySubscribers(evt);
+                PublishToEventHub(evt);
             }
         }
         else
@@ -133,11 +164,21 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
                 _isHealthy = false;
                 _log.Warning("Upstream {Url} is now unhealthy after {Count} consecutive failures",
                     _target.Url, _consecutiveFailures);
-                PublishEvent(new UpstreamHealthChanged(_target.Url, IsHealthy: false));
+                var evt = new UpstreamHealthChanged(_target.Url, IsHealthy: false);
+                NotifySubscribers(evt);
+                PublishToEventHub(evt);
             }
         }
 
         Become(Idle);
+    }
+
+    private void NotifySubscribers(UpstreamHealthChanged evt)
+    {
+        foreach (var subscriber in _subscribers)
+        {
+            subscriber.Tell(evt);
+        }
     }
 
     private void OnGetHealthStatus()
@@ -145,12 +186,12 @@ public sealed class HealthCheckActor : ReceiveActor, IWithTimers, IWithUnbounded
         Sender.Tell(new HealthStatus(_target.Url, _isHealthy, _consecutiveFailures, _consecutiveSuccesses));
     }
 
-    private void PublishEvent(IClusterEvent evt)
+    private void PublishToEventHub(IClusterEvent evt)
     {
         _publishQueue?.OfferAsync(evt).PipeTo(Self,
             success: r => r is QueueOfferResult.Dropped
                 ? new PublishDropped(evt)
-                : Akka.Done.Instance,
+                : Done.Instance,
             failure: ex => new PublishFailed(ex));
     }
 

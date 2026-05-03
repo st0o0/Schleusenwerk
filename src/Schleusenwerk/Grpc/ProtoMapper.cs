@@ -71,9 +71,8 @@ internal static class ProtoMapper
         IsSelfSigned = cert.Issuer == cert.Subject
     };
 
-    public static bool CanMapToProxyEvent(IClusterEvent evt) => evt is
-        DomainConfigured or DomainDeactivated or
-        UpstreamHealthChanged or Persistence.CertificateProvisioningRequested;
+    public static bool CanMapToProxyEvent(IClusterEvent evt) 
+        => evt is DomainConfigured or DomainDeactivated or UpstreamHealthChanged or CertificateProvisioningRequested;
 
     public static ProxyEvent ToProxyEvent(IClusterEvent evt) => evt switch
     {
@@ -93,7 +92,7 @@ internal static class ProtoMapper
             UpstreamUrl = e.Url.Value.ToString(),
             IsHealthy = e.IsHealthy
         },
-        Persistence.CertificateProvisioningRequested e => new ProxyEvent
+        CertificateProvisioningRequested e => new ProxyEvent
         {
             Type = EventType.CertificateProvisioned,
             Domain = e.DomainName.Value

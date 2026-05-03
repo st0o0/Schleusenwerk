@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using Schleusenwerk.Routing;
 using TurboHTTP;
@@ -35,10 +36,13 @@ internal sealed class RequestForwardingPipeline
         {
             requestMessage.Content = new StreamContent(context.Request.Body);
             if (context.Request.ContentType is not null)
-                requestMessage.Content.Headers.ContentType =
-                    System.Net.Http.Headers.MediaTypeHeaderValue.Parse(context.Request.ContentType);
+            {
+                requestMessage.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(context.Request.ContentType);
+            }
             if (context.Request.ContentLength.HasValue)
+            {
                 requestMessage.Content.Headers.ContentLength = context.Request.ContentLength;
+            }
         }
 
         HttpResponseMessage upstreamResponse;

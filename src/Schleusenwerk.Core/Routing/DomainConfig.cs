@@ -11,4 +11,16 @@ public sealed record DomainConfig
     public bool ForceHttps { get; init; }
     public bool PreserveHostHeader { get; init; } = true;
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+    public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
+    public TimeSpan CircuitBreakerCooldown { get; init; } = TimeSpan.FromSeconds(30);
+    public RateLimitConfig? RateLimit { get; init; }
+}
+
+/// <summary>
+/// Rate limiting configuration for a domain.
+/// </summary>
+public sealed record RateLimitConfig
+{
+    public int RequestsPerWindow { get; init; } = 100;
+    public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(60);
 }

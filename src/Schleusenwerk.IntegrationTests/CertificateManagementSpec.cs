@@ -45,7 +45,7 @@ public sealed class CertificateManagementSpec
     public async Task GetCertificate_should_throw_not_found_for_unknown_domain()
     {
         var ex = await Assert.ThrowsAsync<RpcException>(
-            async () => await _certs.GetCertificateAsync(new GetCertificateRequest { Domain = "unknown.test" }));
+            async () => await _certs.GetCertificateAsync(new GetCertificateRequest { Domain = "unknown.test" }, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(StatusCode.NotFound, ex.StatusCode);
     }
 

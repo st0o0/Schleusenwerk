@@ -9,11 +9,13 @@ public sealed class HealthSpec
 {
     private readonly HealthService.HealthServiceClient _health;
     private readonly RouteService.RouteServiceClient _routes;
+    private readonly string _upstreamUrl;
 
     public HealthSpec(SchleusenwerkFixture fixture)
     {
         _health = new HealthService.HealthServiceClient(fixture.GrpcChannel);
         _routes = new RouteService.RouteServiceClient(fixture.GrpcChannel);
+        _upstreamUrl = fixture.UpstreamUrl;
     }
 
     [Fact(Timeout = 30_000)]
@@ -35,7 +37,7 @@ public sealed class HealthSpec
             Domain = domain,
             ForceHttps = false,
             TimeoutSeconds = 30,
-            FirstUpstreamUrl = "http://upstream-mock"
+            FirstUpstreamUrl = _upstreamUrl
         }, cancellationToken: TestContext.Current.CancellationToken);
 
         await Task.Delay(1000, TestContext.Current.CancellationToken);

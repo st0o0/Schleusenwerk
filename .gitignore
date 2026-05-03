@@ -58,3 +58,4 @@ TestResult.xml
 .maggus/interactive.lock
 .maggus/worktrees/
 COMMIT.md
+.worktrees/

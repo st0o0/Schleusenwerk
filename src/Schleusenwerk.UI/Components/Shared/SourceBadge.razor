@@ -1,7 +1,0 @@
-<MudChip T="string" Size="Size.Small" Color="@(Source == "docker" ? Color.Info : Color.Default)">
-    @Source
-</MudChip>
-
-@code {
-    [Parameter, EditorRequired] public string Source { get; set; } = "manual";
-}

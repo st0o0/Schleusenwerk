@@ -22,8 +22,12 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
         registry.Register<EventHub>(hub, overwrite: true);
 
         var store = new FileCertificateStore(_tempDir);
+        var configStore = new InMemoryConfigurationStore();
+        var acmeClient = new MockAcmeClient();
+        var challengeStore = new AcmeChallengeStore();
+
         var actor = Sys.ActorOf(
-            Props.Create(() => new CertificateProvisioningActor(store)),
+            Props.Create(() => new CertificateProvisioningActor(store, configStore, acmeClient, challengeStore)),
             $"cert-prov-{id}");
 
         return (actor, store);
@@ -70,5 +74,56 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
 
         using var loaded = store.GetCertificate(domain);
         Assert.Equal(originalThumbprint, loaded!.Thumbprint);
+    }
+}
+
+// Mock implementations for testing
+internal sealed class InMemoryConfigurationStore : IConfigurationStore
+{
+    private ProxySettings _settings = ProxySettings.Default;
+
+    public Task<ProxySettings> GetSettingsAsync(CancellationToken ct = default)
+    {
+        return Task.FromResult(_settings);
+    }
+
+    public Task UpdateSettingsAsync(ProxySettings settings, CancellationToken ct = default)
+    {
+        _settings = settings;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<DomainConfig>> GetAllDomainsAsync(CancellationToken ct = default)
+    {
+        return Task.FromResult((IReadOnlyList<DomainConfig>)new List<DomainConfig>());
+    }
+
+    public Task<DomainConfig?> GetDomainAsync(DomainName name, CancellationToken ct = default)
+    {
+        return Task.FromResult((DomainConfig?)null);
+    }
+
+    public Task UpsertDomainAsync(DomainConfig config, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveDomainAsync(DomainName name, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class MockAcmeClient : IAcmeClient
+{
+    public Task<AcmeOrderResult> StartOrderAsync(DomainName domain, CancellationToken ct = default)
+    {
+        var result = new AcmeOrderResult("test-token", "test-key-authz");
+        return Task.FromResult(result);
+    }
+
+    public async Task<System.Security.Cryptography.X509Certificates.X509Certificate2> CompleteOrderAsync(DomainName domain, CancellationToken ct = default)
+    {
+        return SelfSignedCertificateGenerator.Generate(domain);
     }
 }

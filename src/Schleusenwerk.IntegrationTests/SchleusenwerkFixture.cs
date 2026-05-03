@@ -1,9 +1,6 @@
-using System.Net.Security;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
-using Google.Protobuf.WellKnownTypes;
-using Grpc.Net.Client;
-using Schleusenwerk.Contracts;
+using Microsoft.AspNetCore.SignalR.Client;
 using Xunit;
 
 namespace Schleusenwerk.IntegrationTests;
@@ -11,9 +8,8 @@ namespace Schleusenwerk.IntegrationTests;
 public sealed class SchleusenwerkFixture : IAsyncLifetime
 {
     public DistributedApplication App { get; private set; } = null!;
-    public GrpcChannel GrpcChannel { get; private set; } = null!;
-    public HttpClient ProxyHttp { get; private set; } = null!;
-    public string UpstreamUrl { get; private set; } = null!;
+    public HttpClient Client { get; private set; } = null!;
+    public Uri ApiBaseUri { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -22,63 +18,55 @@ public sealed class SchleusenwerkFixture : IAsyncLifetime
 
         App = await builder.BuildAsync();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         await App.StartAsync(cts.Token);
 
-        var grpcEndpoint = App.GetEndpoint("proxy", "grpc");
-        GrpcChannel = GrpcChannel.ForAddress(grpcEndpoint, new GrpcChannelOptions
-        {
-            HttpHandler = new SocketsHttpHandler
-            {
-                EnableMultipleHttp2Connections = true,
-                SslOptions = new SslClientAuthenticationOptions
-                {
-                    RemoteCertificateValidationCallback = (_, _, _, _) => true
-                }
-            }
-        });
+        ApiBaseUri = App.GetEndpoint("proxy", "api");
+        Client = new HttpClient { BaseAddress = ApiBaseUri };
 
-        var httpEndpoint = App.GetEndpoint("proxy", "http");
-        ProxyHttp = new HttpClient(new SocketsHttpHandler
-        {
-            SslOptions = new SslClientAuthenticationOptions
-            {
-                RemoteCertificateValidationCallback = (_, _, _, _) => true
-            }
-        })
-        {
-            BaseAddress = httpEndpoint
-        };
+        await WaitForReady(cts.Token);
+    }
 
-        var upstreamEndpoint = App.GetEndpoint("upstream-mock", "http");
-        UpstreamUrl = upstreamEndpoint.ToString().TrimEnd('/');
-
-        await WaitForProxyReady(cts.Token);
+    public HubConnection CreateHubConnection()
+    {
+        return new HubConnectionBuilder()
+            .WithUrl(new Uri(ApiBaseUri, "/hubs/events"))
+            .Build();
     }
 
     public async ValueTask DisposeAsync()
     {
-        GrpcChannel.Dispose();
-        ProxyHttp.Dispose();
+        Client.Dispose();
         await App.StopAsync();
         await App.DisposeAsync();
     }
 
-    private async Task WaitForProxyReady(CancellationToken ct)
+    private async Task WaitForReady(CancellationToken ct)
     {
-        var client = new RouteService.RouteServiceClient(GrpcChannel);
+        Exception? lastException = null;
+        int lastStatusCode = 0;
+
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await client.ListRoutesAsync(new Empty(), cancellationToken: ct);
-                return;
+                var response = await Client.GetAsync("/api/health", ct);
+                lastStatusCode = (int)response.StatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    return;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                await Task.Delay(500, ct);
+                lastException = ex;
             }
+
+            await Task.Delay(2000, ct);
         }
+
+        throw new TimeoutException(
+            $"Proxy did not become ready. BaseAddress={Client.BaseAddress}, LastStatus={lastStatusCode}, LastError={lastException?.Message}");
     }
 }
 

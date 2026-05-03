@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-.NET-based HTTPS reverse proxy replacing https-portal. Built on Kestrel + Akka.NET actors + TurboHTTP for upstream forwarding. Blazor Server management UI, automatic Let's Encrypt certificates, Docker container discovery.
+.NET-based HTTPS reverse proxy replacing https-portal. Built on Kestrel + Akka.NET actors + TurboHTTP for upstream forwarding. Vue.js SPA management UI with OpenAPI REST API, automatic Let's Encrypt certificates, Docker container discovery.
 
 ## Build & Test
 
@@ -31,7 +31,9 @@ Actors          (Schleusenwerk/Actors/)    — DomainRouterActor, HealthCheckAct
 Routing         (Schleusenwerk/Routing/)   — RoundRobinRouter (Akka.NET), RequestForwardingPipeline (TurboHTTP)
 Persistence     (Schleusenwerk/Persistence/) — Akka.Persistence event-sourced state (no EF Core)
 Certificates    (Schleusenwerk/Certificates/) — ACME v2 (Certes), self-signed, SNI selector
-UI              (Schleusenwerk/UI/)        — Blazor Server under /manage, SignalR event bridge
+API             (Schleusenwerk/Controllers/) — REST API (OpenAPI-generated base controllers)
+Hubs            (Schleusenwerk/Hubs/)      — SignalR ProxyEventHub + Akka EventBridge
+Web             (Schleusenwerk.Web/)       — Vue 3 SPA, PrimeVue, Pinia, Blueprint theme
 Discovery       (Schleusenwerk/Discovery/) — Docker socket watcher, label parser, conflict resolver
 ```
 
@@ -57,7 +59,9 @@ For non-actor services: `IRequiredActor<T>` or `IReadOnlyActorRegistry` via DI.
 - **HTTP Client:** TurboHTTP NuGet package for upstream forwarding (not HttpClient)
 - **Load Balancing:** Akka.NET RoundRobinPool/RoundRobinGroup — no custom balancer
 - **TLS:** Kestrel SNI ServerCertificateSelector, Certes for ACME v2
-- **UI:** Blazor Server (same process), SignalR for real-time updates from actors
+- **Management API:** REST/JSON with OpenAPI contract-first (NSwag generates C# base controllers + TypeScript client)
+- **UI:** Vue 3 + Vite + TypeScript SPA with PrimeVue (Unstyled) and Blueprint theme, served by nginx
+- **Live Events:** SignalR WebSocket hub bridged from Akka EventHub via EventBridgeService
 - **Akka Configuration:** Akka.Hosting C# API only — **no HOCON**. All actor system configuration,
   persistence setup, clustering, serialization, and dispatchers must be configured via
   `AkkaConfigurationBuilder` methods in C#. Never use HOCON strings, `.conf` files, or

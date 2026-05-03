@@ -1,13 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
-        <PackageReference Include="Google.Protobuf" />
-        <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
-        <PackageReference Include="Grpc.Core.Api" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Protobuf Include="Protos\*.proto" GrpcServices="Both" />
+        <None Include="openapi.yaml" />
     </ItemGroup>
 
 </Project>

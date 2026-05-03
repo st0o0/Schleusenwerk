@@ -39,6 +39,11 @@ public sealed record SettingsUpdated(ProxySettings Settings);
 public sealed record CertificateProvisioningRequested(DomainName DomainName) : ICertificateEvent;
 
 /// <summary>
+/// Published when a certificate is approaching expiration (14 days or less).
+/// </summary>
+public sealed record CertificateExpiring(DomainName DomainName) : ICertificateEvent;
+
+/// <summary>
 /// Persisted by ConfigurationPersistenceActor when a domain is registered in the index.
 /// </summary>
 public sealed record DomainRegistered(DomainName DomainName);

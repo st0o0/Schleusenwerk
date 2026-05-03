@@ -1,3 +1,4 @@
+using Schleusenwerk.Certificates;
 using Schleusenwerk.Forwarding;
 using Schleusenwerk.RateLimiting;
 using Servus.Core.Application.Startup;
@@ -10,12 +11,20 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
     {
         app.MapGet("/health", () => Results.Ok("healthy"));
 
-        app.MapGrpcService<Grpc.RouteServiceImpl>();
-        app.MapGrpcService<Grpc.CertificateServiceImpl>();
-        app.MapGrpcService<Grpc.HealthServiceImpl>();
-        app.MapGrpcService<Grpc.EventServiceImpl>();
+        app.MapGet("/.well-known/acme-challenge/{token}", (string token, AcmeChallengeStore store) =>
+        {
+            var keyAuthz = store.GetChallenge(token);
+            return keyAuthz is not null ? Results.Text(keyAuthz) : Results.NotFound();
+        });
 
-        app.Use(HttpsRedirectionMiddleware);
+        app.UseCors();
+        app.MapControllers();
+        app.MapHub<Hubs.ProxyEventHub>("/hubs/events");
+
+        if (!app.Environment.IsDevelopment())
+        {
+            app.Use(HttpsRedirectionMiddleware);
+        }
         app.UseWebSockets();
         app.UseRateLimiter();
 

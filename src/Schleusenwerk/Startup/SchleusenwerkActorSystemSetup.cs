@@ -75,7 +75,13 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
             registry.Register<DockerDiscoveryActor>(dockerDiscovery);
 
-            var certProvisioning = system.ActorOf(resolver.Props<CertificateProvisioningActor>(), "cert-provisioning");
+            var certProvisioning = system.ActorOf(
+                Props.Create(() => new CertificateProvisioningActor(
+                    serviceProvider.GetRequiredService<ICertificateStore>(),
+                    serviceProvider.GetRequiredService<IConfigurationStore>(),
+                    serviceProvider.GetRequiredService<IAcmeClient>(),
+                    serviceProvider.GetRequiredService<AcmeChallengeStore>())),
+                "cert-provisioning");
             registry.Register<CertificateProvisioningActor>(certProvisioning);
         });
     }

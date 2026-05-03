@@ -14,19 +14,20 @@ services:
       - db:/data
       - certs:/certs
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80;http://+:5000
+      - Cors__AllowedOrigins=http://localhost:3000
     networks:
       - schleusenwerk
 
-  ui:
+  web:
     build:
-      context: .
-      dockerfile: src/Schleusenwerk.UI/Dockerfile
+      context: src/Schleusenwerk.Web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
     ports:
-      - "8080:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - PROXY_GRPC_ENDPOINT=https://proxy:5000
+      - "3000:3000"
     networks:
       - schleusenwerk
     depends_on:

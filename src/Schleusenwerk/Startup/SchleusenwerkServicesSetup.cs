@@ -32,21 +32,45 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         var certsPath = configuration["Certificates:Path"] ?? "/certs";
         services.AddSingleton<ICertificateStore>(new FileCertificateStore(certsPath));
         services.AddSingleton<SniCertificateSelector>();
+        services.AddSingleton<AcmeChallengeStore>();
+        services.AddSingleton<IAcmeClient>(sp =>
+            new CertesAcmeClient(
+                sp.GetRequiredService<IConfigurationStore>(),
+                certsPath,
+                sp.GetRequiredService<ILogger<CertesAcmeClient>>()));
 
-        services.Configure<KestrelServerOptions>(options =>
+        var urls = configuration["ASPNETCORE_URLS"] ?? configuration["urls"] ?? "";
+        if (urls.Contains("https", StringComparison.OrdinalIgnoreCase))
         {
-            options.ConfigureHttpsDefaults(adapterOptions =>
+            services.Configure<KestrelServerOptions>(options =>
             {
-                var selector = options.ApplicationServices!.GetRequiredService<SniCertificateSelector>();
-                adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
+                options.ConfigureHttpsDefaults(adapterOptions =>
+                {
+                    var selector = options.ApplicationServices!.GetRequiredService<SniCertificateSelector>();
+                    adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
+                });
             });
-        });
+        }
 
         var rateLimitCache = new RateLimitConfigCache();
         services.AddSingleton(rateLimitCache);
         services.AddRateLimiter(options => options.ConfigurePolicy(rateLimitCache));
 
-        services.AddGrpc();
+        services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                var allowedOrigins = configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:3000";
+                policy.WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            });
+        });
+
+        services.AddControllers();
+        services.AddSignalR();
+        services.AddHostedService<Hubs.EventBridgeService>();
         services.AddSingleton<IMaterializer>(sp =>
             sp.GetRequiredService<ActorSystem>().Materializer());
     }

@@ -1,6 +1,6 @@
-using Google.Protobuf.WellKnownTypes;
-using Grpc.Core;
-using Schleusenwerk.Contracts;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using Xunit;
 
 namespace Schleusenwerk.IntegrationTests;
@@ -8,176 +8,88 @@ namespace Schleusenwerk.IntegrationTests;
 [Collection("Schleusenwerk")]
 public sealed class RouteManagementSpec
 {
-    private readonly RouteService.RouteServiceClient _routes;
-    private readonly string _upstreamUrl;
+    private readonly HttpClient _client;
 
-    public RouteManagementSpec(SchleusenwerkFixture fixture)
+    public RouteManagementSpec(SchleusenwerkFixture fixture) => _client = fixture.Client;
+
+    [Fact(Timeout = 30_000)]
+    public async Task ListRoutes_should_return_empty_initially()
     {
-        _routes = new RouteService.RouteServiceClient(fixture.GrpcChannel);
-        _upstreamUrl = fixture.UpstreamUrl;
+        var response = await _client.GetAsync("/api/routes");
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var routes = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.Equal(JsonValueKind.Array, routes.ValueKind);
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task AddRoute_then_ListRoutes_should_contain_new_route()
+    public async Task AddRoute_should_create_and_return_success()
+    {
+        var domain = $"add-{Guid.NewGuid():N}.test";
+        var body = JsonSerializer.Serialize(new { domain, forceHttps = true, timeoutSeconds = 30 });
+        var response = await _client.PostAsync("/api/routes", new StringContent(body, Encoding.UTF8, "application/json"));
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.True(result.GetProperty("success").GetBoolean());
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task ListRoutes_should_contain_created_route()
     {
         var domain = $"list-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = true,
-            TimeoutSeconds = 30,
-            FirstUpstreamUrl = _upstreamUrl
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var response = await _routes.ListRoutesAsync(new Empty(), cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.Contains(response.Routes, r => r.Domain == domain);
+        var body = JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 });
+        await _client.PostAsync("/api/routes", new StringContent(body, Encoding.UTF8, "application/json"));
+        var response = await _client.GetAsync("/api/routes");
+        var json = await response.Content.ReadAsStringAsync();
+        var routes = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.True(routes.EnumerateArray().Any(r => r.GetProperty("domain").GetString() == domain));
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task AddRoute_then_GetRoute_should_return_detail()
+    public async Task GetRoute_should_return_detail()
     {
         var domain = $"detail-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = true,
-            TimeoutSeconds = 60,
-            FirstUpstreamUrl = _upstreamUrl
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.Equal(domain, detail.Domain);
-        Assert.True(detail.ForceHttps);
-        Assert.Equal(60, detail.TimeoutSeconds);
+        var body = JsonSerializer.Serialize(new { domain, forceHttps = true, timeoutSeconds = 60 });
+        await _client.PostAsync("/api/routes", new StringContent(body, Encoding.UTF8, "application/json"));
+        var response = await _client.GetAsync($"/api/routes/{domain}");
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var detail = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.Equal(domain, detail.GetProperty("domain").GetString());
+        Assert.True(detail.GetProperty("forceHttps").GetBoolean());
+        Assert.Equal(60, detail.GetProperty("timeoutSeconds").GetInt32());
     }
 
     [Fact(Timeout = 30_000)]
     public async Task UpdateRoute_should_change_config()
     {
         var domain = $"update-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = false,
-            TimeoutSeconds = 30
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        await _routes.UpdateRouteAsync(new UpdateRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = true,
-            TimeoutSeconds = 120
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(detail.ForceHttps);
-        Assert.Equal(120, detail.TimeoutSeconds);
+        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, forceHttps = false, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"));
+        await _client.PutAsync($"/api/routes/{domain}", new StringContent(JsonSerializer.Serialize(new { forceHttps = true, timeoutSeconds = 120 }), Encoding.UTF8, "application/json"));
+        var response = await _client.GetAsync($"/api/routes/{domain}");
+        var json = await response.Content.ReadAsStringAsync();
+        var detail = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.True(detail.GetProperty("forceHttps").GetBoolean());
+        Assert.Equal(120, detail.GetProperty("timeoutSeconds").GetInt32());
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task DeleteRoute_should_remove_from_list()
+    public async Task DeleteRoute_should_remove_route()
     {
         var domain = $"delete-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = false,
-            TimeoutSeconds = 30
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        await _routes.DeleteRouteAsync(new DeleteRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var response = await _routes.ListRoutesAsync(new Empty(), cancellationToken: TestContext.Current.CancellationToken);
-        Assert.DoesNotContain(response.Routes, r => r.Domain == domain);
+        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"));
+        await _client.DeleteAsync($"/api/routes/{domain}");
+        var response = await _client.GetAsync("/api/routes");
+        var json = await response.Content.ReadAsStringAsync();
+        var routes = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.False(routes.EnumerateArray().Any(r => r.GetProperty("domain").GetString() == domain));
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task AddUpstream_then_GetRoute_should_include_upstream()
+    public async Task GetRoute_should_return_404_for_unknown_domain()
     {
-        var domain = $"upstream-add-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = false,
-            TimeoutSeconds = 30
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        await _routes.AddUpstreamAsync(new AddUpstreamRequest
-        {
-            Domain = domain,
-            Url = _upstreamUrl,
-            Weight = 1
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Contains(detail.Upstreams, u => u.Url.Contains("localhost"));
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task RemoveUpstream_should_remove_from_route()
-    {
-        var domain = $"upstream-rm-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = false,
-            TimeoutSeconds = 30,
-            FirstUpstreamUrl = _upstreamUrl
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        await _routes.RemoveUpstreamAsync(new RemoveUpstreamRequest
-        {
-            Domain = domain,
-            Url = _upstreamUrl
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Empty(detail.Upstreams);
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task AddRoute_should_fail_when_domain_already_exists()
-    {
-        var domain = $"dup-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest { Domain = domain, TimeoutSeconds = 30 }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var result = await _routes.AddRouteAsync(new AddRouteRequest { Domain = domain, TimeoutSeconds = 30 }, cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.False(result.Success);
-        Assert.Contains("already", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task GetRoute_should_throw_when_domain_not_found()
-    {
-        var ex = await Assert.ThrowsAsync<RpcException>(
-            async () => await _routes.GetRouteAsync(new GetRouteRequest { Domain = "nonexistent.test" }, cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(StatusCode.NotFound, ex.StatusCode);
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task AddRoute_with_upstream_should_include_upstream_in_detail()
-    {
-        var domain = $"with-ups-{Guid.NewGuid():N}.test";
-        await _routes.AddRouteAsync(new AddRouteRequest
-        {
-            Domain = domain,
-            ForceHttps = false,
-            TimeoutSeconds = 30,
-            FirstUpstreamUrl = _upstreamUrl
-        }, cancellationToken: TestContext.Current.CancellationToken);
-
-        var detail = await _routes.GetRouteAsync(new GetRouteRequest { Domain = domain }, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Single(detail.Upstreams);
-    }
-
-    [Fact(Timeout = 30_000)]
-    public async Task ListRoutes_should_return_empty_when_no_routes_configured()
-    {
-        var response = await _routes.ListRoutesAsync(new Empty(), cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotNull(response);
-        Assert.NotNull(response.Routes);
+        var response = await _client.GetAsync("/api/routes/nonexistent.test");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

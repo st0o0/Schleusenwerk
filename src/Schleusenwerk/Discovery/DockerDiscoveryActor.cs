@@ -25,7 +25,7 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
 
     private DockerClient? _client;
     private CancellationTokenSource? _monitorCts;
-    private readonly Dictionary<string, (DomainName Domain, UpstreamUrl Url)> _tracked = new();
+    private readonly Dictionary<string, TrackedContainer> _tracked = new();
 
     public DockerDiscoveryActor()
     {
@@ -41,6 +41,8 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
             _log.Warning("Failed to inspect container {Id}: {Error}", msg.ContainerId[..12], msg.Error.Message));
         Receive<MonitoringEnded>(Handle);
         Receive<Noop>(_ => { });
+        Receive<GetDiscoveredContainers>(_ =>
+            Sender.Tell(new DiscoveredContainersResult(_tracked.Values.ToList())));
     }
 
     protected override void PreStart()
@@ -170,7 +172,13 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
     {
         var ip = ExtractIp(msg.Response.NetworkSettings.Networks);
         var labels = msg.Response.Config.Labels ?? new Dictionary<string, string>();
-        RegisterContainerIfLabeled(msg.Response.ID, labels, ip);
+        RegisterContainerIfLabeled(
+            msg.Response.ID,
+            msg.Response.Name?.TrimStart('/') ?? msg.Response.ID[..12],
+            msg.Response.Config.Image ?? "",
+            msg.Response.State?.Status ?? "",
+            labels,
+            ip);
     }
 
     private void Handle(MonitoringEnded msg)
@@ -189,9 +197,14 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         {
             var ip = ExtractIp(container.NetworkSettings?.Networks);
             var labels = container.Labels ?? new Dictionary<string, string>();
-            RegisterContainerIfLabeled(container.ID, labels, ip);
+            RegisterContainerIfLabeled(
+                container.ID,
+                container.Names?.FirstOrDefault()?.TrimStart('/') ?? container.ID[..12],
+                container.Image ?? "",
+                container.State ?? "",
+                labels,
+                ip);
         }
-
         StartMonitoring();
     }
 
@@ -201,18 +214,30 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         StartMonitoring();
     }
 
-    private void RegisterContainerIfLabeled(string containerId, IDictionary<string, string> labels, string? ip)
+    private void RegisterContainerIfLabeled(
+        string containerId, string name, string image, string status,
+        IDictionary<string, string> labels, string? ip)
     {
         if (!labels.ContainsKey("schleusenwerk.domain"))
+        {
+            _tracked[containerId] = new TrackedContainer(
+                containerId, name, image, status,
+                new Dictionary<string, string>(labels), null, null);
             return;
+        }
 
         if (!ContainerLabelParser.TryParse(labels, ip, out var parsed, out var error))
         {
             _log.Warning("Skipping container {Id}: {Error}", containerId[..12], error);
+            _tracked[containerId] = new TrackedContainer(
+                containerId, name, image, status,
+                new Dictionary<string, string>(labels), null, null);
             return;
         }
 
-        _tracked[containerId] = (parsed.Domain, parsed.Upstream.Url);
+        _tracked[containerId] = new TrackedContainer(
+            containerId, name, image, status,
+            new Dictionary<string, string>(labels), parsed.Domain, parsed.Upstream.Url);
 
         var domainConfig = new DomainConfig
         {
@@ -233,9 +258,11 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
             return;
         }
 
-        _domainRegion.Tell(new RemoveUpstream(entry.Domain, entry.Url));
-
-        _log.Info("Unregistered container {Id} upstream {Url}", containerId[..12], entry.Url);
+        if (entry.AssignedDomain is not null && entry.AssignedUrl is not null)
+        {
+            _domainRegion.Tell(new RemoveUpstream(entry.AssignedDomain.Value, entry.AssignedUrl.Value));
+            _log.Info("Unregistered container {Id} upstream {Url}", containerId[..12], entry.AssignedUrl);
+        }
     }
 
     private void StartMonitoring()

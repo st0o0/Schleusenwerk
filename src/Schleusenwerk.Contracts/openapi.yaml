@@ -1,0 +1,468 @@
+openapi: '3.0.3'
+info:
+  title: Schleusenwerk Management API
+  version: '1.0.0'
+  description: REST API for managing the Schleusenwerk reverse proxy
+
+paths:
+  /api/routes:
+    get:
+      operationId: listRoutes
+      tags: [Routes]
+      summary: List all configured routes
+      responses:
+        '200':
+          description: List of route summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RouteSummary'
+    post:
+      operationId: addRoute
+      tags: [Routes]
+      summary: Create a new route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRouteRequest'
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/routes/{domain}:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getRoute
+      tags: [Routes]
+      summary: Get route detail with health status
+      responses:
+        '200':
+          description: Route detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteDetail'
+        '404':
+          description: Route not found
+    put:
+      operationId: updateRoute
+      tags: [Routes]
+      summary: Update route configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteRequest'
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+    delete:
+      operationId: deleteRoute
+      tags: [Routes]
+      summary: Delete a route
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/routes/{domain}/upstreams:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: addUpstream
+      tags: [Routes]
+      summary: Add an upstream to a route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddUpstreamRequest'
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/routes/{domain}/upstreams/{encodedUrl}:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: encodedUrl
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Base64url-encoded upstream URL
+    delete:
+      operationId: removeUpstream
+      tags: [Routes]
+      summary: Remove an upstream from a route
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/certificates:
+    get:
+      operationId: listCertificates
+      tags: [Certificates]
+      summary: List all certificates
+      responses:
+        '200':
+          description: List of certificate summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CertificateSummary'
+
+  /api/certificates/{domain}:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getCertificate
+      tags: [Certificates]
+      summary: Get certificate detail
+      responses:
+        '200':
+          description: Certificate detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificateDetail'
+        '404':
+          description: Certificate not found
+
+  /api/certificates/{domain}/provision:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: provisionCertificate
+      tags: [Certificates]
+      summary: Trigger certificate provisioning
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/certificates/{domain}/upload:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: uploadCertificate
+      tags: [Certificates]
+      summary: Upload a custom certificate (PEM or PFX)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PFX file or PEM cert file
+                keyFile:
+                  type: string
+                  format: binary
+                  description: PEM key file (required for PEM, not used for PFX)
+                password:
+                  type: string
+                  description: PFX password (optional)
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Get overall proxy health
+      responses:
+        '200':
+          description: Proxy health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProxyHealthResponse'
+
+  /api/health/{domain}:
+    parameters:
+      - name: domain
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getUpstreamHealth
+      tags: [Health]
+      summary: Get upstream health for a domain
+      responses:
+        '200':
+          description: Upstream health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamHealthResponse'
+
+  /api/discovery/containers:
+    get:
+      operationId: listContainers
+      tags: [Discovery]
+      summary: List discovered Docker containers
+      responses:
+        '200':
+          description: List of discovered containers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscoveredContainer'
+
+components:
+  schemas:
+    CommandResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        errorMessage:
+          type: string
+          nullable: true
+
+    RouteSummary:
+      type: object
+      required: [domain, forceHttps, source, timeoutSeconds, upstreams]
+      properties:
+        domain:
+          type: string
+        forceHttps:
+          type: boolean
+        source:
+          type: string
+        timeoutSeconds:
+          type: integer
+        upstreams:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamInfo'
+
+    UpstreamInfo:
+      type: object
+      required: [url, weight]
+      properties:
+        url:
+          type: string
+        weight:
+          type: integer
+
+    RouteDetail:
+      type: object
+      required: [domain, forceHttps, timeoutSeconds, source, upstreams, health]
+      properties:
+        domain:
+          type: string
+        forceHttps:
+          type: boolean
+        timeoutSeconds:
+          type: integer
+        source:
+          type: string
+        upstreams:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamInfo'
+        health:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamHealthEntry'
+
+    UpstreamHealthEntry:
+      type: object
+      required: [url, isHealthy]
+      properties:
+        url:
+          type: string
+        isHealthy:
+          type: boolean
+
+    AddRouteRequest:
+      type: object
+      required: [domain]
+      properties:
+        domain:
+          type: string
+        forceHttps:
+          type: boolean
+          default: false
+        timeoutSeconds:
+          type: integer
+          default: 30
+        firstUpstreamUrl:
+          type: string
+          nullable: true
+
+    UpdateRouteRequest:
+      type: object
+      properties:
+        forceHttps:
+          type: boolean
+        timeoutSeconds:
+          type: integer
+
+    AddUpstreamRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+        weight:
+          type: integer
+          default: 1
+
+    CertificateSummary:
+      type: object
+      required: [domain, thumbprint, notAfter, isSelfSigned]
+      properties:
+        domain:
+          type: string
+        thumbprint:
+          type: string
+        notAfter:
+          type: string
+        isSelfSigned:
+          type: boolean
+
+    CertificateDetail:
+      type: object
+      required: [domain, thumbprint, notBefore, notAfter, issuer, isSelfSigned]
+      properties:
+        domain:
+          type: string
+        thumbprint:
+          type: string
+        notBefore:
+          type: string
+        notAfter:
+          type: string
+        issuer:
+          type: string
+        isSelfSigned:
+          type: boolean
+
+    ProxyHealthResponse:
+      type: object
+      required: [routeCount, healthyCount, unhealthyCount]
+      properties:
+        routeCount:
+          type: integer
+        healthyCount:
+          type: integer
+        unhealthyCount:
+          type: integer
+
+    UpstreamHealthResponse:
+      type: object
+      required: [domain, upstreams]
+      properties:
+        domain:
+          type: string
+        upstreams:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamHealthEntry'
+
+    ProxyEventDto:
+      type: object
+      required: [type, domain, message, isHealthy, upstreamUrl]
+      properties:
+        type:
+          type: string
+          enum: [RouteUpdated, RouteRemoved, UpstreamHealthChanged, CertificateProvisioned, CertificateExpiring]
+        domain:
+          type: string
+        message:
+          type: string
+        isHealthy:
+          type: boolean
+        upstreamUrl:
+          type: string
+
+    DiscoveredContainer:
+      type: object
+      required: [name, image, status, labels]
+      properties:
+        name:
+          type: string
+        image:
+          type: string
+        status:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        assignedDomain:
+          type: string
+          nullable: true
+        conflictReason:
+          type: string
+          nullable: true

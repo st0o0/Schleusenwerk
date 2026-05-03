@@ -39,7 +39,4 @@
         <PackageVersion Include="Aspire.Hosting.Orchestration.win-x64" Version="13.2.4"/>
         <PackageVersion Include="Aspire.Dashboard.Sdk.win-x64" Version="13.2.4"/>
     </ItemGroup>
-    <ItemGroup Label="ACME">
-        <PackageVersion Include="Certes" Version="3.0.4"/>
-    </ItemGroup>
 </Project>

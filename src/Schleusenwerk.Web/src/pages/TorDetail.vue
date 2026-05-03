@@ -1,32 +1,32 @@
 <template>
   <div>
     <div class="bp-breadcrumb">
-      <RouterLink to="/tore">SCHLEUSENTORE</RouterLink>
+      <RouterLink to="/tore">{{ t('routes.title') }}</RouterLink>
       <span style="color: var(--bp-border); margin: 0 6px;">/</span>
       <span class="current">{{ domain }}</span>
     </div>
-    <div v-if="routes.loading" style="color: var(--bp-text-secondary);">Laden...</div>
-    <div v-else-if="!routes.detail" style="color: var(--bp-error);">Tor nicht gefunden.</div>
+    <div v-if="routes.loading" style="color: var(--bp-text-secondary);">{{ t('common.loading') }}</div>
+    <div v-else-if="!routes.detail" style="color: var(--bp-error);">{{ t('routes.notFound') }}</div>
     <template v-else>
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
         <StatusIndicator :status="isHealthy ? 'offen' : 'gesperrt'" />
         <span style="color: var(--bp-text-primary); font-family: var(--bp-font-mono); font-size: 18px; font-weight: 700;">{{ domain }}</span>
-        <span class="bp-badge" :class="isHealthy ? 'bp-badge-primary' : 'bp-badge-error'">{{ isHealthy ? 'offen' : 'gesperrt' }}</span>
-        <span v-if="routes.detail.forceHttps" class="bp-badge bp-badge-primary">versiegelt</span>
+        <span class="bp-badge" :class="isHealthy ? 'bp-badge-primary' : 'bp-badge-error'">{{ isHealthy ? t('routes.healthy') : t('routes.unhealthy') }}</span>
+        <span v-if="routes.detail.forceHttps" class="bp-badge bp-badge-primary">{{ t('routes.sealed') }}</span>
       </div>
       <div style="display: grid; grid-template-columns: 280px 1fr; gap: 24px;">
-        <BpPanel label="Konfiguration">
+        <BpPanel :label="t('routes.configuration')">
           <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
             <input type="checkbox" v-model="forceHttps" />
-            <span style="color: var(--bp-text-secondary); font-family: var(--bp-font-mono); font-size: 12px;">Versiegelung (HTTPS)</span>
+            <span style="color: var(--bp-text-secondary); font-family: var(--bp-font-mono); font-size: 12px;">{{ t('routes.forceHttps') }}</span>
           </div>
           <div style="margin-bottom: 16px;">
-            <label style="color: var(--bp-text-secondary); font-size: 11px; display: block; margin-bottom: 4px;">Timeout (s)</label>
+            <label style="color: var(--bp-text-secondary); font-size: 11px; display: block; margin-bottom: 4px;">{{ t('routes.timeout') }}</label>
             <input v-model.number="timeoutSeconds" type="number" min="5" max="300" class="bp-input" />
           </div>
-          <button class="bp-btn-filled" style="width: 100%;" @click="saveConfig">SPEICHERN</button>
+          <button class="bp-btn-filled" style="width: 100%;" @click="saveConfig">{{ t('common.save') }}</button>
         </BpPanel>
-        <BpPanel label="Kammern">
+        <BpPanel :label="t('routes.upstreams')">
           <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
             <div v-for="upstream in routes.detail.upstreams" :key="upstream.url"
                  style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(30,58,95,0.8); border-radius: 4px;">
@@ -38,7 +38,7 @@
           </div>
           <div style="display: flex; gap: 8px;">
             <input v-model="newUpstreamUrl" class="bp-input" placeholder="http://upstream:port" style="flex: 1;" />
-            <button class="bp-btn-outline" @click="handleAddUpstream">+ KAMMER</button>
+            <button class="bp-btn-outline" @click="handleAddUpstream">{{ t('routes.addUpstream') }}</button>
           </div>
         </BpPanel>
       </div>
@@ -48,10 +48,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import StatusIndicator from '@/components/StatusIndicator.vue'
 import BpPanel from '@/components/BpPanel.vue'
 import { useRoutesStore } from '@/stores/routes'
 
+const { t } = useI18n()
 const props = defineProps<{ domain: string }>()
 const routes = useRoutesStore()
 const forceHttps = ref(false); const timeoutSeconds = ref(30); const newUpstreamUrl = ref('')

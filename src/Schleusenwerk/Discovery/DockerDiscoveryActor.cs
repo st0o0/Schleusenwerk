@@ -243,6 +243,7 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         {
             DomainName = parsed.Domain,
             ForceHttps = true,
+            TlsMode = parsed.TlsMode,
         };
 
         _domainRegion.Tell(new AddDomain(domainConfig));

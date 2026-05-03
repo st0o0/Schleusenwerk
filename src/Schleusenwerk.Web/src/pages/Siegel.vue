@@ -1,20 +1,20 @@
 <template>
   <div>
-    <div class="page-header"><h1>SIEGEL</h1><span class="separator">——</span><span class="subtitle">TLS-Zertifikate</span></div>
-    <div v-if="certs.loading" style="color: var(--bp-text-secondary);">Laden...</div>
+    <div class="page-header"><h1>{{ t('certificates.title') }}</h1><span class="separator">——</span><span class="subtitle">{{ t('certificates.subtitle') }}</span></div>
+    <div v-if="certs.loading" style="color: var(--bp-text-secondary);">{{ t('common.loading') }}</div>
     <table v-else class="bp-table">
-      <thead><tr><th style="width: 28px;"></th><th>Domain</th><th>Fingerabdruck</th><th>Gültig bis</th><th>Typ</th><th style="width: 80px;"></th><th style="width: 80px;"></th></tr></thead>
+      <thead><tr><th style="width: 28px;"></th><th>{{ t('common.domain') }}</th><th>{{ t('certificates.thumbprint') }}</th><th>{{ t('certificates.validUntil') }}</th><th>{{ t('certificates.type') }}</th><th style="width: 80px;"></th><th style="width: 80px;"></th></tr></thead>
       <tbody>
         <tr v-for="cert in certs.list" :key="cert.domain">
           <td><SiegelIcon :status="getSiegelStatus(cert)" /></td>
           <td style="color: var(--bp-text-primary);">{{ cert.domain }}</td>
           <td style="font-size: 11px; color: var(--bp-text-secondary);">{{ cert.thumbprint.slice(0, 12) }}…</td>
           <td><span :style="{ color: isExpiring(cert) ? 'var(--bp-warning)' : 'var(--bp-primary)' }">{{ formatDate(cert.notAfter) }}</span></td>
-          <td><span class="bp-badge" :class="cert.isSelfSigned ? 'bp-badge-warning' : 'bp-badge-primary'">{{ cert.isSelfSigned ? 'Selbst' : 'ACME' }}</span></td>
-          <td><button class="bp-btn-outline" style="font-size: 11px; padding: 2px 8px;" @click="renew(cert.domain)">Erneuern</button></td>
+          <td><span class="bp-badge" :class="cert.isSelfSigned ? 'bp-badge-warning' : 'bp-badge-primary'">{{ cert.isSelfSigned ? t('certificates.selfSigned') : t('certificates.acme') }}</span></td>
+          <td><button class="bp-btn-outline" style="font-size: 11px; padding: 2px 8px;" @click="renew(cert.domain)">{{ t('certificates.renew') }}</button></td>
           <td>
             <label class="bp-btn-outline" style="font-size: 11px; padding: 2px 8px; cursor: pointer;">
-              Upload
+              {{ t('certificates.upload') }}
               <input type="file" style="display: none;" @change="(e) => handleUpload(cert.domain, e)" accept=".pem,.crt,.pfx,.p12" />
             </label>
           </td>
@@ -26,10 +26,12 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import SiegelIcon from '@/components/SiegelIcon.vue'
 import { useCertificatesStore } from '@/stores/certificates'
 import type { CertificateSummary } from '@/api/client'
 
+const { t } = useI18n()
 const certs = useCertificatesStore()
 onMounted(() => certs.fetchList())
 

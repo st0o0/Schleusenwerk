@@ -14,6 +14,7 @@ internal static class DomainModelMapper
             ForceHttps: config.ForceHttps,
             Source: "manual",
             TimeoutSeconds: (int)config.RequestTimeout.TotalSeconds,
+            TlsMode: config.TlsMode.ToString().ToLowerInvariant(),
             Upstreams: upstreams.Select(ToUpstreamInfo).ToList());
 
     public static UpstreamInfoDto ToUpstreamInfo(UpstreamTarget target) =>
@@ -28,6 +29,7 @@ internal static class DomainModelMapper
             ForceHttps: config.ForceHttps,
             TimeoutSeconds: (int)config.RequestTimeout.TotalSeconds,
             Source: "manual",
+            TlsMode: config.TlsMode.ToString().ToLowerInvariant(),
             Upstreams: upstreams.Select(ToUpstreamInfo).ToList(),
             Health: health.Select(h => new UpstreamHealthEntryDto(h.Url.Value.ToString(), h.IsHealthy)).ToList());
 

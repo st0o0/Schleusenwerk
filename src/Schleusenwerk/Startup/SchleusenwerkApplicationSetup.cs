@@ -1,4 +1,3 @@
-using Schleusenwerk.Certificates;
 using Schleusenwerk.Forwarding;
 using Schleusenwerk.RateLimiting;
 using Servus.Core.Application.Startup;
@@ -11,10 +10,16 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
     {
         app.MapGet("/health", () => Results.Ok("healthy"));
 
-        app.MapGet("/.well-known/acme-challenge/{token}", (string token, AcmeChallengeStore store) =>
+        app.MapGet("/.well-known/acme-challenge/{token}", (string token, IConfiguration config) =>
         {
-            var keyAuthz = store.GetChallenge(token);
-            return keyAuthz is not null ? Results.Text(keyAuthz) : Results.NotFound();
+            var webrootPath = config["Lego:WebrootPath"] ?? "/tmp/acme-webroot";
+            var filePath = Path.Combine(webrootPath, ".well-known", "acme-challenge", token);
+            if (!File.Exists(filePath))
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Text(File.ReadAllText(filePath));
         });
 
         app.UseCors();

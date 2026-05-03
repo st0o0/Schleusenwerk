@@ -1,3 +1,5 @@
+using Schleusenwerk.Certificates;
+
 namespace Schleusenwerk.Routing;
 
 /// <summary>
@@ -14,6 +16,7 @@ public sealed record DomainConfig
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan CircuitBreakerCooldown { get; init; } = TimeSpan.FromSeconds(30);
     public RateLimitConfig? RateLimit { get; init; }
+    public TlsMode TlsMode { get; init; } = TlsMode.LetsEncrypt;
 }
 
 /// <summary>

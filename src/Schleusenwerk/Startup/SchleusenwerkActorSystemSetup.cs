@@ -79,8 +79,8 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
                 Props.Create(() => new CertificateProvisioningActor(
                     serviceProvider.GetRequiredService<ICertificateStore>(),
                     serviceProvider.GetRequiredService<IConfigurationStore>(),
-                    serviceProvider.GetRequiredService<IAcmeClient>(),
-                    serviceProvider.GetRequiredService<AcmeChallengeStore>())),
+                    serviceProvider.GetRequiredService<IConfigurationService>(),
+                    serviceProvider.GetRequiredService<ILegoCertificateProvider>())),
                 "cert-provisioning");
             registry.Register<CertificateProvisioningActor>(certProvisioning);
         });

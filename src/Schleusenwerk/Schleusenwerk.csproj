@@ -9,7 +9,6 @@
         <PackageReference Include="TurboHTTP" />
         <PackageReference Include="Servus.Akka" />
         <PackageReference Include="Servus.Core" />
-        <PackageReference Include="Certes" />
     </ItemGroup>
 
     <ItemGroup>

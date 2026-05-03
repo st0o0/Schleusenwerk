@@ -1,18 +1,18 @@
 <template>
   <div>
     <div class="page-header">
-      <h1>LEITSTAND</h1>
+      <h1>{{ t('dashboard.title') }}</h1>
       <span class="separator">——</span>
-      <span class="subtitle">Systemübersicht</span>
+      <span class="subtitle">{{ t('dashboard.subtitle') }}</span>
     </div>
-    <div v-if="health.loading" style="color: var(--bp-text-secondary);">Laden...</div>
+    <div v-if="health.loading" style="color: var(--bp-text-secondary);">{{ t('common.loading') }}</div>
     <div v-else-if="health.error" style="color: var(--bp-error);">{{ health.error }}</div>
     <template v-else-if="health.data">
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
-        <BpKpi label="Tore gesamt" :value="health.data.routeCount" color="var(--bp-text-primary)" />
-        <BpKpi label="Tore offen" :value="health.data.healthyCount" color="var(--bp-primary)" />
-        <BpKpi label="Tore gesperrt" :value="health.data.unhealthyCount" color="var(--bp-error)" />
-        <BpKpi label="Siegel ablaufend" :value="expiringCerts" color="var(--bp-warning)" />
+        <BpKpi :label="t('dashboard.totalRoutes')" :value="health.data.routeCount" color="var(--bp-text-primary)" />
+        <BpKpi :label="t('dashboard.healthyRoutes')" :value="health.data.healthyCount" color="var(--bp-primary)" />
+        <BpKpi :label="t('dashboard.unhealthyRoutes')" :value="health.data.unhealthyCount" color="var(--bp-error)" />
+        <BpKpi :label="t('dashboard.expiringCerts')" :value="expiringCerts" color="var(--bp-warning)" />
       </div>
     </template>
   </div>
@@ -20,10 +20,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import BpKpi from '@/components/BpKpi.vue'
 import { useHealthStore } from '@/stores/health'
 import { useCertificatesStore } from '@/stores/certificates'
 
+const { t } = useI18n()
 const health = useHealthStore()
 const certs = useCertificatesStore()
 const expiringCerts = ref(0)

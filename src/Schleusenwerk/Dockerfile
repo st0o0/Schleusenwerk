@@ -12,9 +12,14 @@ RUN dotnet restore ./src/Schleusenwerk/Schleusenwerk.csproj && \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 
+COPY --from=goacme/lego /lego /usr/local/bin/lego
+
 WORKDIR /app
 
 COPY --from=build /app .
+
+RUN mkdir -p /tmp/acme-webroot/.well-known/acme-challenge && \
+    mkdir -p /certs/lego
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:80;https://+:5000

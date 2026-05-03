@@ -11,6 +11,7 @@ public sealed record RouteSummaryDto(
     bool ForceHttps,
     string Source,
     int TimeoutSeconds,
+    string TlsMode,
     IReadOnlyList<UpstreamInfoDto> Upstreams);
 
 public sealed record UpstreamInfoDto(string Url, int Weight);
@@ -20,6 +21,7 @@ public sealed record RouteDetailDto(
     bool ForceHttps,
     int TimeoutSeconds,
     string Source,
+    string TlsMode,
     IReadOnlyList<UpstreamInfoDto> Upstreams,
     IReadOnlyList<UpstreamHealthEntryDto> Health);
 
@@ -29,6 +31,7 @@ public sealed record AddRouteRequestDto(
     string Domain,
     bool ForceHttps = false,
     int TimeoutSeconds = 30,
+    string TlsMode = "letsencrypt",
     string? FirstUpstreamUrl = null);
 
 public sealed record UpdateRouteRequestDto(
@@ -76,3 +79,19 @@ public sealed record DiscoveredContainerDto(
     IReadOnlyDictionary<string, string> Labels,
     string? AssignedDomain,
     string? ConflictReason);
+
+public sealed record ProxySettingsDto(
+    string Stage,
+    string AcmeEmail,
+    string DnsProvider,
+    int DefaultRequestTimeoutSeconds,
+    int MaxConnectionsPerUpstream,
+    bool ForceHttpsGlobally);
+
+public sealed record UpdateSettingsRequestDto(
+    string? Stage = null,
+    string? AcmeEmail = null,
+    string? DnsProvider = null,
+    int? DefaultRequestTimeoutSeconds = null,
+    int? MaxConnectionsPerUpstream = null,
+    bool? ForceHttpsGlobally = null);

@@ -20,20 +20,20 @@ public sealed class CertificateProvisioningActor : ReceiveActor, IWithTimers
     private readonly ILoggingAdapter _log = Context.GetLogger();
     private readonly ICertificateStore _store;
     private readonly IConfigurationStore _configStore;
-    private readonly IAcmeClient _acmeClient;
-    private readonly AcmeChallengeStore _challengeStore;
+    private readonly IConfigurationService _configService;
+    private readonly ILegoCertificateProvider _lego;
     private readonly IActorRef _eventHub;
 
     public CertificateProvisioningActor(
         ICertificateStore store,
         IConfigurationStore configStore,
-        IAcmeClient acmeClient,
-        AcmeChallengeStore challengeStore)
+        IConfigurationService configService,
+        ILegoCertificateProvider lego)
     {
         _store = store;
         _configStore = configStore;
-        _acmeClient = acmeClient;
-        _challengeStore = challengeStore;
+        _configService = configService;
+        _lego = lego;
         _eventHub = Context.GetActor<EventHub>();
 
         Receive<CertificateProvisioningRequested>(Handle);
@@ -75,8 +75,12 @@ public sealed class CertificateProvisioningActor : ReceiveActor, IWithTimers
             try
             {
                 var settings = await _configStore.GetSettingsAsync();
+                var domainResult = await _configService.GetByDomainAsync(domain);
+                var tlsMode = domainResult is ConfigurationResult<DomainConfigResult>.Success success
+                    ? success.Value.Config.TlsMode
+                    : TlsMode.LetsEncrypt;
 
-                if (settings.Stage == AcmeStage.Local)
+                if (settings.Stage == AcmeStage.Local || tlsMode == TlsMode.SelfSigned)
                 {
                     if (_store.HasCertificate(domain))
                     {
@@ -88,19 +92,19 @@ public sealed class CertificateProvisioningActor : ReceiveActor, IWithTimers
                     return new ProvisioningResult(domain, true, null, attempt);
                 }
 
-                var order = await _acmeClient.StartOrderAsync(domain);
-                _challengeStore.SetChallenge(order.Token, order.KeyAuthorization);
-
-                try
+                if (tlsMode == TlsMode.Custom)
                 {
-                    using var cert = await _acmeClient.CompleteOrderAsync(domain);
-                    _store.StoreCertificate(domain, cert);
                     return new ProvisioningResult(domain, true, null, attempt);
                 }
-                finally
+
+                if (tlsMode == TlsMode.Dns && string.IsNullOrWhiteSpace(settings.DnsProvider))
                 {
-                    _challengeStore.RemoveChallenge(order.Token);
+                    return new ProvisioningResult(domain, false, "DNS-01 requested but no LEGO_DNS_PROVIDER configured", attempt);
                 }
+
+                using var legoCert = await _lego.ProvisionAsync(domain, tlsMode);
+                _store.StoreCertificate(domain, legoCert);
+                return new ProvisioningResult(domain, true, null, attempt);
             }
             catch (Exception ex)
             {

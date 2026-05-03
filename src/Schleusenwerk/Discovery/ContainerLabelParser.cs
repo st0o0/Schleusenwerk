@@ -1,3 +1,4 @@
+using Schleusenwerk.Certificates;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Routing;
 
@@ -9,7 +10,8 @@ namespace Schleusenwerk.Discovery;
 public sealed record ParsedContainerConfig(
     DomainName Domain,
     UpstreamTarget Upstream,
-    HealthCheckConfig HealthCheck
+    HealthCheckConfig HealthCheck,
+    TlsMode TlsMode
 );
 
 /// <summary>
@@ -58,8 +60,9 @@ public static class ContainerLabelParser
 
         var upstream = new UpstreamTarget { Url = url };
         var healthCheck = ParseHealthCheckConfig(labels);
+        var tlsMode = ParseTlsMode(labels);
 
-        result = new ParsedContainerConfig(domain, upstream, healthCheck);
+        result = new ParsedContainerConfig(domain, upstream, healthCheck, tlsMode);
         error = null!;
         return true;
     }
@@ -83,6 +86,23 @@ public static class ContainerLabelParser
         }
 
         return config;
+    }
+
+    private static TlsMode ParseTlsMode(IDictionary<string, string> labels)
+    {
+        if (!labels.TryGetValue("schleusenwerk.tls", out var tls))
+        {
+            return TlsMode.LetsEncrypt;
+        }
+
+        return tls.ToLowerInvariant() switch
+        {
+            "letsencrypt" => TlsMode.LetsEncrypt,
+            "dns" => TlsMode.Dns,
+            "selfsigned" => TlsMode.SelfSigned,
+            "custom" => TlsMode.Custom,
+            _ => TlsMode.LetsEncrypt,
+        };
     }
 
     // Parses simple duration strings like "30s", "1m", "5m30s".

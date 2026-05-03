@@ -4,8 +4,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 const props = defineProps<{ status: 'offen' | 'gesperrt' | 'warnung' | 'neutral' }>()
 const title = computed(() => {
-  switch (props.status) { case 'offen': return 'Offen'; case 'gesperrt': return 'Gesperrt'; case 'warnung': return 'Warnung'; default: return props.status }
+  switch (props.status) { case 'offen': return t('status.healthy'); case 'gesperrt': return t('status.unhealthy'); case 'warnung': return t('status.warning'); default: return props.status }
 })
 </script>

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Schleusenwerk.Api;
+using Schleusenwerk.Certificates;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 
@@ -48,11 +49,20 @@ public sealed class RouteController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<CommandResultDto>> AddRoute([FromBody] AddRouteRequestDto request, CancellationToken ct)
     {
+        var tlsMode = request.TlsMode.ToLowerInvariant() switch
+        {
+            "dns" => TlsMode.Dns,
+            "selfsigned" => TlsMode.SelfSigned,
+            "custom" => TlsMode.Custom,
+            _ => TlsMode.LetsEncrypt,
+        };
+
         var config = new DomainConfig
         {
             DomainName = DomainName.Parse(request.Domain),
             ForceHttps = request.ForceHttps,
-            RequestTimeout = TimeSpan.FromSeconds(request.TimeoutSeconds > 0 ? request.TimeoutSeconds : 30)
+            RequestTimeout = TimeSpan.FromSeconds(request.TimeoutSeconds > 0 ? request.TimeoutSeconds : 30),
+            TlsMode = tlsMode
         };
 
         var addResult = await _config.AddDomainAsync(config, ct);

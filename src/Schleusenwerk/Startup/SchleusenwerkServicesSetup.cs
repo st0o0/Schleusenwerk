@@ -32,12 +32,17 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         var certsPath = configuration["Certificates:Path"] ?? "/certs";
         services.AddSingleton<ICertificateStore>(new FileCertificateStore(certsPath));
         services.AddSingleton<SniCertificateSelector>();
-        services.AddSingleton<AcmeChallengeStore>();
-        services.AddSingleton<IAcmeClient>(sp =>
-            new CertesAcmeClient(
+
+        var legoPath = configuration["Lego:Path"] ?? "/certs/lego";
+        var webrootPath = configuration["Lego:WebrootPath"] ?? "/tmp/acme-webroot";
+        services.AddSingleton<ILegoCertificateProvider>(sp =>
+            new LegoCertificateProvider(
                 sp.GetRequiredService<IConfigurationStore>(),
-                certsPath,
-                sp.GetRequiredService<ILogger<CertesAcmeClient>>()));
+                legoPath,
+                webrootPath,
+                sp.GetRequiredService<ILogger<LegoCertificateProvider>>()));
+
+        services.AddHostedService<EnvironmentConfigInitializer>();
 
         var urls = configuration["ASPNETCORE_URLS"] ?? configuration["urls"] ?? "";
         if (urls.Contains("https", StringComparison.OrdinalIgnoreCase))

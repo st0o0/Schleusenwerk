@@ -23,11 +23,11 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
 
         var store = new FileCertificateStore(_tempDir);
         var configStore = new InMemoryConfigurationStore();
-        var acmeClient = new MockAcmeClient();
-        var challengeStore = new AcmeChallengeStore();
+        var configService = new MockConfigurationService();
+        var legoProvider = new MockLegoCertificateProvider();
 
         var actor = Sys.ActorOf(
-            Props.Create(() => new CertificateProvisioningActor(store, configStore, acmeClient, challengeStore)),
+            Props.Create(() => new CertificateProvisioningActor(store, configStore, configService, legoProvider)),
             $"cert-prov-{id}");
 
         return (actor, store);
@@ -114,16 +114,74 @@ internal sealed class InMemoryConfigurationStore : IConfigurationStore
     }
 }
 
-internal sealed class MockAcmeClient : IAcmeClient
+internal sealed class MockConfigurationService : IConfigurationService
 {
-    public Task<AcmeOrderResult> StartOrderAsync(DomainName domain, CancellationToken ct = default)
+    public Task<ConfigurationResult<ConfigurationSnapshot>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var result = new AcmeOrderResult("test-token", "test-key-authz");
-        return Task.FromResult(result);
+        throw new NotImplementedException();
     }
 
-    public async Task<System.Security.Cryptography.X509Certificates.X509Certificate2> CompleteOrderAsync(DomainName domain, CancellationToken ct = default)
+    public Task<ConfigurationResult<DomainConfigResult>> GetByDomainAsync(DomainName domain, CancellationToken cancellationToken = default)
     {
-        return SelfSignedCertificateGenerator.Generate(domain);
+        var config = new DomainConfig
+        {
+            DomainName = domain,
+            TlsMode = TlsMode.LetsEncrypt,
+        };
+        var result = new ConfigurationResult<DomainConfigResult>.Success(new DomainConfigResult(config, (IReadOnlyList<UpstreamTarget>)new List<UpstreamTarget>()));
+        return Task.FromResult((ConfigurationResult<DomainConfigResult>)result);
+    }
+
+    public Task<ConfigurationResult> AddDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult> UpdateDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult> RemoveDomainAsync(DomainName domainName, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult> AddUpstreamAsync(DomainName domainName, UpstreamTarget upstream, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult> RemoveUpstreamAsync(DomainName domainName, UpstreamUrl upstreamUrl, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult<ProxySettings>> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult> UpdateSettingsAsync(ProxySettings settings, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<ConfigurationResult<string>> ExportAsync(ConfigurationExportOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+internal sealed class MockLegoCertificateProvider : ILegoCertificateProvider
+{
+    public Task<System.Security.Cryptography.X509Certificates.X509Certificate2> ProvisionAsync(DomainName domain, TlsMode mode, CancellationToken ct = default)
+    {
+        return Task.FromResult(SelfSignedCertificateGenerator.Generate(domain));
+    }
+
+    public Task<System.Security.Cryptography.X509Certificates.X509Certificate2> RenewAsync(DomainName domain, TlsMode mode, CancellationToken ct = default)
+    {
+        return Task.FromResult(SelfSignedCertificateGenerator.Generate(domain));
     }
 }

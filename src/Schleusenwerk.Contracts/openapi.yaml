@@ -276,6 +276,36 @@ paths:
                 items:
                   $ref: '#/components/schemas/DiscoveredContainer'
 
+  /api/settings:
+    get:
+      operationId: getSettings
+      tags: [Settings]
+      summary: Get proxy settings
+      responses:
+        '200':
+          description: Proxy settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProxySettings'
+    put:
+      operationId: updateSettings
+      tags: [Settings]
+      summary: Update proxy settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+      responses:
+        '200':
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+
 components:
   schemas:
     CommandResult:
@@ -290,7 +320,7 @@ components:
 
     RouteSummary:
       type: object
-      required: [domain, forceHttps, source, timeoutSeconds, upstreams]
+      required: [domain, forceHttps, source, timeoutSeconds, tlsMode, upstreams]
       properties:
         domain:
           type: string
@@ -300,6 +330,9 @@ components:
           type: string
         timeoutSeconds:
           type: integer
+        tlsMode:
+          type: string
+          enum: [letsencrypt, dns, selfsigned, custom]
         upstreams:
           type: array
           items:
@@ -316,7 +349,7 @@ components:
 
     RouteDetail:
       type: object
-      required: [domain, forceHttps, timeoutSeconds, source, upstreams, health]
+      required: [domain, forceHttps, timeoutSeconds, source, tlsMode, upstreams, health]
       properties:
         domain:
           type: string
@@ -326,6 +359,9 @@ components:
           type: integer
         source:
           type: string
+        tlsMode:
+          type: string
+          enum: [letsencrypt, dns, selfsigned, custom]
         upstreams:
           type: array
           items:
@@ -356,6 +392,10 @@ components:
         timeoutSeconds:
           type: integer
           default: 30
+        tlsMode:
+          type: string
+          enum: [letsencrypt, dns, selfsigned, custom]
+          default: letsencrypt
         firstUpstreamUrl:
           type: string
           nullable: true
@@ -465,4 +505,45 @@ components:
           nullable: true
         conflictReason:
           type: string
+          nullable: true
+
+    ProxySettings:
+      type: object
+      required: [stage, acmeEmail, dnsProvider, defaultRequestTimeoutSeconds, maxConnectionsPerUpstream, forceHttpsGlobally]
+      properties:
+        stage:
+          type: string
+          enum: [local, staging, production]
+        acmeEmail:
+          type: string
+        dnsProvider:
+          type: string
+        defaultRequestTimeoutSeconds:
+          type: integer
+        maxConnectionsPerUpstream:
+          type: integer
+        forceHttpsGlobally:
+          type: boolean
+
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        stage:
+          type: string
+          enum: [local, staging, production]
+          nullable: true
+        acmeEmail:
+          type: string
+          nullable: true
+        dnsProvider:
+          type: string
+          nullable: true
+        defaultRequestTimeoutSeconds:
+          type: integer
+          nullable: true
+        maxConnectionsPerUpstream:
+          type: integer
+          nullable: true
+        forceHttpsGlobally:
+          type: boolean
           nullable: true

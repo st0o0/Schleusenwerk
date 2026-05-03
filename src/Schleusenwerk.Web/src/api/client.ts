@@ -13,9 +13,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export interface CommandResult { success: boolean; errorMessage?: string | null }
-export interface RouteSummary { domain: string; forceHttps: boolean; source: string; timeoutSeconds: number; upstreams: UpstreamInfo[] }
+export interface RouteSummary { domain: string; forceHttps: boolean; source: string; timeoutSeconds: number; tlsMode: string; upstreams: UpstreamInfo[] }
 export interface UpstreamInfo { url: string; weight: number }
-export interface RouteDetail { domain: string; forceHttps: boolean; timeoutSeconds: number; source: string; upstreams: UpstreamInfo[]; health: UpstreamHealthEntry[] }
+export interface RouteDetail { domain: string; forceHttps: boolean; timeoutSeconds: number; source: string; tlsMode: string; upstreams: UpstreamInfo[]; health: UpstreamHealthEntry[] }
 export interface UpstreamHealthEntry { url: string; isHealthy: boolean }
 export interface CertificateSummary { domain: string; thumbprint: string; notAfter: string; isSelfSigned: boolean }
 export interface CertificateDetail { domain: string; thumbprint: string; notBefore: string; notAfter: string; issuer: string; isSelfSigned: boolean }
@@ -23,6 +23,7 @@ export interface ProxyHealthResponse { routeCount: number; healthyCount: number;
 export interface UpstreamHealthResponse { domain: string; upstreams: UpstreamHealthEntry[] }
 export interface ProxyEventDto { type: string; domain: string; message: string; isHealthy: boolean; upstreamUrl: string }
 export interface DiscoveredContainer { name: string; image: string; status: string; labels: Record<string, string>; assignedDomain: string | null; conflictReason: string | null }
+export interface ProxySettings { stage: string; acmeEmail: string; dnsProvider: string; defaultRequestTimeoutSeconds: number; maxConnectionsPerUpstream: number; forceHttpsGlobally: boolean }
 
 function toBase64Url(input: string): string {
   return btoa(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -65,5 +66,10 @@ export const api = {
   },
   discovery: {
     listContainers: () => request<DiscoveredContainer[]>('/discovery/containers'),
+  },
+  settings: {
+    get: () => request<ProxySettings>('/settings'),
+    update: (body: Partial<ProxySettings>) =>
+      request<CommandResult>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
   },
 }

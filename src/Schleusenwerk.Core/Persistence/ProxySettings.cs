@@ -11,6 +11,7 @@ public sealed record ProxySettings
     public int SnapshotInterval { get; init; } = 100;
     public AcmeStage Stage { get; init; } = AcmeStage.Local;
     public string AcmeEmail { get; init; } = "";
+    public string DnsProvider { get; init; } = "";
 
     public static ProxySettings Default => new();
 }

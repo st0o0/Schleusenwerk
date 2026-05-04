@@ -61,6 +61,7 @@ public sealed class RouteController : ControllerBase
         {
             DomainName = DomainName.Parse(request.Domain),
             ForceHttps = request.ForceHttps,
+            WebSocketEnabled = request.WebSocketEnabled,
             RequestTimeout = TimeSpan.FromSeconds(request.TimeoutSeconds > 0 ? request.TimeoutSeconds : 30),
             TlsMode = tlsMode
         };
@@ -97,6 +98,7 @@ public sealed class RouteController : ControllerBase
         var updated = existing.Value.Config with
         {
             ForceHttps = request.ForceHttps,
+            WebSocketEnabled = request.WebSocketEnabled,
             RequestTimeout = TimeSpan.FromSeconds(request.TimeoutSeconds > 0 ? request.TimeoutSeconds : 30)
         };
 

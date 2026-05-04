@@ -81,6 +81,12 @@ internal sealed class ProxyDispatcher : IProxyDispatcher
 
         if (WebSocketTunnel.IsWebSocketUpgrade(context.Request))
         {
+            if (!config.WebSocketEnabled)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
             await _webSocketTunnel.TunnelAsync(context, upstream, config, ct);
             return;
         }

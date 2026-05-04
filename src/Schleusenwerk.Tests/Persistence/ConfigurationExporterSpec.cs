@@ -289,6 +289,60 @@ public sealed class ConfigurationExporterSpec
     }
 
     [Fact(Timeout = 5000)]
+    public void Roundtrip_should_preserve_websocket_enabled()
+    {
+        var domain = new DomainConfig
+        {
+            DomainName = DomainName.Parse("ws.example.com"),
+            WebSocketEnabled = true,
+        };
+        var snapshot = CreateSnapshot(domains: [domain]);
+
+        var json = ConfigurationExporter.ToJson(snapshot);
+        var doc = ConfigurationExporter.FromJson(json);
+        Assert.NotNull(doc);
+        var restored = ConfigurationExporter.ToSnapshot(doc);
+
+        Assert.Single(restored.Domains);
+        Assert.True(restored.Domains[0].WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
+    public void Roundtrip_should_preserve_websocket_disabled()
+    {
+        var domain = new DomainConfig
+        {
+            DomainName = DomainName.Parse("no-ws.example.com"),
+            WebSocketEnabled = false,
+        };
+        var snapshot = CreateSnapshot(domains: [domain]);
+
+        var json = ConfigurationExporter.ToJson(snapshot);
+        var doc = ConfigurationExporter.FromJson(json);
+        Assert.NotNull(doc);
+        var restored = ConfigurationExporter.ToSnapshot(doc);
+
+        Assert.Single(restored.Domains);
+        Assert.False(restored.Domains[0].WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
+    public void ToExportDocument_should_export_websocket_flag()
+    {
+        var domain = new DomainConfig
+        {
+            DomainName = DomainName.Parse("ws-export.example.com"),
+            WebSocketEnabled = true,
+        };
+        var snapshot = CreateSnapshot(domains: [domain]);
+
+        var doc = ConfigurationExporter.ToExportDocument(snapshot);
+
+        Assert.Single(doc.Domains);
+        Assert.True(doc.Domains[0].WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
     public void ToExportDocument_should_handle_domain_without_upstreams()
     {
         var domain = CreateDomain("orphan.com");

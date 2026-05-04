@@ -37,6 +37,9 @@ public sealed record DomainExportEntry
     [JsonPropertyName("preserveHostHeader")]
     public required bool PreserveHostHeader { get; init; }
 
+    [JsonPropertyName("webSocketEnabled")]
+    public bool WebSocketEnabled { get; init; }
+
     [JsonPropertyName("requestTimeoutSeconds")]
     public required double RequestTimeoutSeconds { get; init; }
 

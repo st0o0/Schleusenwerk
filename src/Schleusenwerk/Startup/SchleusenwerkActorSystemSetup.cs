@@ -10,6 +10,7 @@ using Schleusenwerk.Discovery;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
+using Servus.Akka;
 using Servus.Akka.Startup;
 
 namespace Schleusenwerk.Startup;
@@ -21,7 +22,8 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
     protected override void BuildSystem(AkkaConfigurationBuilder builder, IServiceProvider serviceProvider)
     {
         var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-        var connectionString = configuration["Akka:Persistence:ConnectionString"] ?? "Data Source=/data/schleusenwerk.db";
+        var connectionString =
+            configuration["Akka:Persistence:ConnectionString"] ?? "Data Source=/data/schleusenwerk.db";
         var hostname = configuration["Akka:Remoting:Hostname"] ?? "127.0.0.1";
         var port = int.TryParse(configuration["Akka:Remoting:Port"], out var p) ? p : 2552;
 
@@ -46,7 +48,6 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             messageExtractor,
             new ShardOptions
             {
-                PassivateIdleEntityAfter = TimeSpan.FromMinutes(5),
                 RememberEntities = true
             });
 
@@ -63,7 +64,6 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             messageExtractor,
             new ShardOptions
             {
-                PassivateIdleEntityAfter = TimeSpan.FromMinutes(10),
                 RememberEntities = false
             });
 
@@ -75,13 +75,7 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
             registry.Register<DockerDiscoveryActor>(dockerDiscovery);
 
-            var certProvisioning = system.ActorOf(
-                Props.Create(() => new CertificateProvisioningActor(
-                    serviceProvider.GetRequiredService<ICertificateStore>(),
-                    serviceProvider.GetRequiredService<IConfigurationStore>(),
-                    serviceProvider.GetRequiredService<IConfigurationService>(),
-                    serviceProvider.GetRequiredService<ILegoCertificateProvider>())),
-                "cert-provisioning");
+            var certProvisioning = system.ResolveActor<CertificateProvisioningActor>("cert-provisioning");
             registry.Register<CertificateProvisioningActor>(certProvisioning);
         });
     }

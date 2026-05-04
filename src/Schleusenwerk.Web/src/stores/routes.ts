@@ -19,11 +19,11 @@ export const useRoutesStore = defineStore('routes', () => {
     finally { loading.value = false }
   }
 
-  async function addRoute(body: { domain: string; forceHttps?: boolean; timeoutSeconds?: number; firstUpstreamUrl?: string }): Promise<CommandResult> {
+  async function addRoute(body: { domain: string; forceHttps?: boolean; webSocketEnabled?: boolean; timeoutSeconds?: number; firstUpstreamUrl?: string }): Promise<CommandResult> {
     return api.routes.add(body)
   }
 
-  async function updateRoute(domain: string, body: { forceHttps: boolean; timeoutSeconds: number }): Promise<CommandResult> {
+  async function updateRoute(domain: string, body: { forceHttps: boolean; webSocketEnabled: boolean; timeoutSeconds: number }): Promise<CommandResult> {
     return api.routes.update(domain, body)
   }
 

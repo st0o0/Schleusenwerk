@@ -20,6 +20,10 @@
             <input type="checkbox" v-model="forceHttps" />
             <span style="color: var(--bp-text-secondary); font-family: var(--bp-font-mono); font-size: 12px;">{{ t('routes.forceHttps') }}</span>
           </div>
+          <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" v-model="webSocketEnabled" />
+            <span style="color: var(--bp-text-secondary); font-family: var(--bp-font-mono); font-size: 12px;">{{ t('routes.webSocketEnabled') }}</span>
+          </div>
           <div style="margin-bottom: 16px;">
             <label style="color: var(--bp-text-secondary); font-size: 11px; display: block; margin-bottom: 4px;">{{ t('routes.timeout') }}</label>
             <input v-model.number="timeoutSeconds" type="number" min="5" max="300" class="bp-input" />
@@ -56,16 +60,16 @@ import { useRoutesStore } from '@/stores/routes'
 const { t } = useI18n()
 const props = defineProps<{ domain: string }>()
 const routes = useRoutesStore()
-const forceHttps = ref(false); const timeoutSeconds = ref(30); const newUpstreamUrl = ref('')
+const forceHttps = ref(false); const webSocketEnabled = ref(false); const timeoutSeconds = ref(30); const newUpstreamUrl = ref('')
 const isHealthy = computed(() => routes.detail?.health.every(h => h.isHealthy) ?? true)
 function isUpstreamHealthy(url: string): boolean { return routes.detail?.health.find(h => h.url === url)?.isHealthy ?? true }
 
 onMounted(async () => {
   await routes.fetchDetail(props.domain)
-  if (routes.detail) { forceHttps.value = routes.detail.forceHttps; timeoutSeconds.value = routes.detail.timeoutSeconds || 30 }
+  if (routes.detail) { forceHttps.value = routes.detail.forceHttps; webSocketEnabled.value = routes.detail.webSocketEnabled; timeoutSeconds.value = routes.detail.timeoutSeconds || 30 }
 })
 
-async function saveConfig() { await routes.updateRoute(props.domain, { forceHttps: forceHttps.value, timeoutSeconds: timeoutSeconds.value }) }
+async function saveConfig() { await routes.updateRoute(props.domain, { forceHttps: forceHttps.value, webSocketEnabled: webSocketEnabled.value, timeoutSeconds: timeoutSeconds.value }) }
 async function handleAddUpstream() {
   if (!newUpstreamUrl.value) { return }
   const result = await routes.addUpstream(props.domain, { url: newUpstreamUrl.value })

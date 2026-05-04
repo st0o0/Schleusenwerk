@@ -13,9 +13,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export interface CommandResult { success: boolean; errorMessage?: string | null }
-export interface RouteSummary { domain: string; forceHttps: boolean; source: string; timeoutSeconds: number; tlsMode: string; upstreams: UpstreamInfo[] }
+export interface RouteSummary { domain: string; forceHttps: boolean; source: string; timeoutSeconds: number; tlsMode: string; webSocketEnabled: boolean; upstreams: UpstreamInfo[] }
 export interface UpstreamInfo { url: string; weight: number }
-export interface RouteDetail { domain: string; forceHttps: boolean; timeoutSeconds: number; source: string; tlsMode: string; upstreams: UpstreamInfo[]; health: UpstreamHealthEntry[] }
+export interface RouteDetail { domain: string; forceHttps: boolean; timeoutSeconds: number; source: string; tlsMode: string; webSocketEnabled: boolean; upstreams: UpstreamInfo[]; health: UpstreamHealthEntry[] }
 export interface UpstreamHealthEntry { url: string; isHealthy: boolean }
 export interface CertificateSummary { domain: string; thumbprint: string; notAfter: string; isSelfSigned: boolean }
 export interface CertificateDetail { domain: string; thumbprint: string; notBefore: string; notAfter: string; issuer: string; isSelfSigned: boolean }
@@ -33,9 +33,9 @@ export const api = {
   routes: {
     list: () => request<RouteSummary[]>('/routes'),
     get: (domain: string) => request<RouteDetail>(`/routes/${encodeURIComponent(domain)}`),
-    add: (body: { domain: string; forceHttps?: boolean; timeoutSeconds?: number; firstUpstreamUrl?: string }) =>
+    add: (body: { domain: string; forceHttps?: boolean; webSocketEnabled?: boolean; timeoutSeconds?: number; firstUpstreamUrl?: string }) =>
       request<CommandResult>('/routes', { method: 'POST', body: JSON.stringify(body) }),
-    update: (domain: string, body: { forceHttps: boolean; timeoutSeconds: number }) =>
+    update: (domain: string, body: { forceHttps: boolean; webSocketEnabled: boolean; timeoutSeconds: number }) =>
       request<CommandResult>(`/routes/${encodeURIComponent(domain)}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (domain: string) =>
       request<CommandResult>(`/routes/${encodeURIComponent(domain)}`, { method: 'DELETE' }),

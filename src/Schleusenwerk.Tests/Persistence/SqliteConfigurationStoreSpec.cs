@@ -122,6 +122,7 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             RedirectUrl = new Uri("https://other.com"),
             ForceHttps = true,
             PreserveHostHeader = false,
+            WebSocketEnabled = true,
             RequestTimeout = TimeSpan.FromSeconds(60),
         };
 
@@ -133,7 +134,57 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
         Assert.Equal(new Uri("https://other.com"), result.RedirectUrl);
         Assert.True(result.ForceHttps);
         Assert.False(result.PreserveHostHeader);
+        Assert.True(result.WebSocketEnabled);
         Assert.Equal(TimeSpan.FromSeconds(60), result.RequestTimeout);
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task UpsertDomainAsync_should_persist_websocket_disabled()
+    {
+        var config = new DomainConfig
+        {
+            DomainName = DomainName.Parse("no-ws.com"),
+            WebSocketEnabled = false,
+        };
+
+        await _store.UpsertDomainAsync(config);
+        var result = await _store.GetDomainAsync(DomainName.Parse("no-ws.com"));
+
+        Assert.NotNull(result);
+        Assert.False(result.WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task UpsertDomainAsync_should_persist_websocket_enabled()
+    {
+        var config = new DomainConfig
+        {
+            DomainName = DomainName.Parse("ws.com"),
+            WebSocketEnabled = true,
+        };
+
+        await _store.UpsertDomainAsync(config);
+        var result = await _store.GetDomainAsync(DomainName.Parse("ws.com"));
+
+        Assert.NotNull(result);
+        Assert.True(result.WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
+    public async Task UpsertDomainAsync_should_update_websocket_flag()
+    {
+        var config = new DomainConfig
+        {
+            DomainName = DomainName.Parse("toggle-ws.com"),
+            WebSocketEnabled = false,
+        };
+        await _store.UpsertDomainAsync(config);
+
+        await _store.UpsertDomainAsync(config with { WebSocketEnabled = true });
+        var result = await _store.GetDomainAsync(DomainName.Parse("toggle-ws.com"));
+
+        Assert.NotNull(result);
+        Assert.True(result.WebSocketEnabled);
     }
 
     [Fact(Timeout = 5000)]

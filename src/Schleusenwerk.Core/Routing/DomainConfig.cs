@@ -12,6 +12,7 @@ public sealed record DomainConfig
     public Uri? RedirectUrl { get; init; }
     public bool ForceHttps { get; init; }
     public bool PreserveHostHeader { get; init; } = true;
+    public bool WebSocketEnabled { get; init; }
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan CircuitBreakerCooldown { get; init; } = TimeSpan.FromSeconds(30);

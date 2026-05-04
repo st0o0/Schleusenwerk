@@ -12,6 +12,7 @@ public sealed record RouteSummaryDto(
     string Source,
     int TimeoutSeconds,
     string TlsMode,
+    bool WebSocketEnabled,
     IReadOnlyList<UpstreamInfoDto> Upstreams);
 
 public sealed record UpstreamInfoDto(string Url, int Weight);
@@ -22,6 +23,7 @@ public sealed record RouteDetailDto(
     int TimeoutSeconds,
     string Source,
     string TlsMode,
+    bool WebSocketEnabled,
     IReadOnlyList<UpstreamInfoDto> Upstreams,
     IReadOnlyList<UpstreamHealthEntryDto> Health);
 
@@ -32,11 +34,13 @@ public sealed record AddRouteRequestDto(
     bool ForceHttps = false,
     int TimeoutSeconds = 30,
     string TlsMode = "letsencrypt",
+    bool WebSocketEnabled = false,
     string? FirstUpstreamUrl = null);
 
 public sealed record UpdateRouteRequestDto(
     bool ForceHttps,
-    int TimeoutSeconds);
+    int TimeoutSeconds,
+    bool WebSocketEnabled = false);
 
 public sealed record AddUpstreamRequestDto(
     string Url,

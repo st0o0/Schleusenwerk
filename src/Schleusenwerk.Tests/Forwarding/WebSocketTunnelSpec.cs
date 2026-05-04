@@ -249,4 +249,24 @@ public sealed class WebSocketTunnelSpec
         WebSocketTunnel.ConfigureUpstreamSocket(context.Request, socket);
         Assert.NotNull(socket);
     }
+
+    [Fact(Timeout = 5000)]
+    public void DomainConfig_should_disable_websocket_by_default()
+    {
+        var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
+
+        Assert.False(config.WebSocketEnabled);
+    }
+
+    [Fact(Timeout = 5000)]
+    public void DomainConfig_should_allow_disabling_websocket()
+    {
+        var config = new DomainConfig
+        {
+            DomainName = DomainName.Parse("example.com"),
+            WebSocketEnabled = false,
+        };
+
+        Assert.False(config.WebSocketEnabled);
+    }
 }

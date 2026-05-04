@@ -59,6 +59,7 @@ public static class ConfigurationExporter
                 RedirectUrl = domain.RedirectUrl?.ToString(),
                 ForceHttps = domain.ForceHttps,
                 PreserveHostHeader = domain.PreserveHostHeader,
+                WebSocketEnabled = domain.WebSocketEnabled,
                 RequestTimeoutSeconds = domain.RequestTimeout.TotalSeconds,
                 Upstreams = upstreams,
                 Certificate = certificate,
@@ -104,6 +105,7 @@ public static class ConfigurationExporter
             RedirectUrl = entry.RedirectUrl is not null ? new Uri(entry.RedirectUrl) : null,
             ForceHttps = entry.ForceHttps,
             PreserveHostHeader = entry.PreserveHostHeader,
+            WebSocketEnabled = entry.WebSocketEnabled,
             RequestTimeout = TimeSpan.FromSeconds(entry.RequestTimeoutSeconds),
         }).ToList();
 

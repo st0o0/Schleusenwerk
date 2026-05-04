@@ -47,6 +47,7 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
                 redirect_url TEXT,
                 force_https INTEGER NOT NULL,
                 preserve_host_header INTEGER NOT NULL,
+                websocket_enabled INTEGER NOT NULL DEFAULT 0,
                 request_timeout_ms INTEGER NOT NULL
             );
             """;
@@ -105,7 +106,7 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
     {
         using var connection = Open();
         using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, request_timeout_ms FROM domain_configs";
+        cmd.CommandText = "SELECT domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, websocket_enabled, request_timeout_ms FROM domain_configs";
 
         var domains = new List<DomainConfig>();
         using var reader = cmd.ExecuteReader();
@@ -121,7 +122,7 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
     {
         using var connection = Open();
         using var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, request_timeout_ms FROM domain_configs WHERE domain_name = @name";
+        cmd.CommandText = "SELECT domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, websocket_enabled, request_timeout_ms FROM domain_configs WHERE domain_name = @name";
         cmd.Parameters.AddWithValue("@name", name.Value);
 
         using var reader = cmd.ExecuteReader();
@@ -138,14 +139,15 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
         using var connection = Open();
         using var cmd = connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO domain_configs (domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, request_timeout_ms)
-            VALUES (@name, @wildcard, @redirect, @redirectUrl, @forceHttps, @preserveHost, @timeout)
+            INSERT INTO domain_configs (domain_name, is_wildcard, http_redirect, redirect_url, force_https, preserve_host_header, websocket_enabled, request_timeout_ms)
+            VALUES (@name, @wildcard, @redirect, @redirectUrl, @forceHttps, @preserveHost, @wsEnabled, @timeout)
             ON CONFLICT(domain_name) DO UPDATE SET
                 is_wildcard = @wildcard,
                 http_redirect = @redirect,
                 redirect_url = @redirectUrl,
                 force_https = @forceHttps,
                 preserve_host_header = @preserveHost,
+                websocket_enabled = @wsEnabled,
                 request_timeout_ms = @timeout
             """;
         cmd.Parameters.AddWithValue("@name", config.DomainName.Value);
@@ -154,6 +156,7 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
         cmd.Parameters.AddWithValue("@redirectUrl", (object?)config.RedirectUrl?.ToString() ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@forceHttps", config.ForceHttps ? 1 : 0);
         cmd.Parameters.AddWithValue("@preserveHost", config.PreserveHostHeader ? 1 : 0);
+        cmd.Parameters.AddWithValue("@wsEnabled", config.WebSocketEnabled ? 1 : 0);
         cmd.Parameters.AddWithValue("@timeout", (long)config.RequestTimeout.TotalMilliseconds);
         cmd.ExecuteNonQuery();
 
@@ -188,7 +191,8 @@ public sealed class SqliteConfigurationStore : IConfigurationStore, IDisposable
             RedirectUrl = reader.IsDBNull(3) ? null : new Uri(reader.GetString(3)),
             ForceHttps = reader.GetInt64(4) != 0,
             PreserveHostHeader = reader.GetInt64(5) != 0,
-            RequestTimeout = TimeSpan.FromMilliseconds(reader.GetInt64(6)),
+            WebSocketEnabled = reader.GetInt64(6) != 0,
+            RequestTimeout = TimeSpan.FromMilliseconds(reader.GetInt64(7)),
         };
     }
 }

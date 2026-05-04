@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   proxy:
     build:
@@ -15,7 +13,7 @@ services:
       - certs:/certs
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:80;http://+:5000
+      - ASPNETCORE_URLS=http://+:80;https://+:443;http://+:5000
       - Cors__AllowedOrigins=http://localhost:3000
     networks:
       - schleusenwerk
@@ -23,9 +21,7 @@ services:
   web:
     build:
       context: src/Schleusenwerk.Web
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:5000
+      dockerfile: Dockerfile.prod
     ports:
       - "3000:3000"
     networks:

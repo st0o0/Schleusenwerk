@@ -1,39 +1,35 @@
-version: '3.8'
-
 services:
   proxy:
-    build:
-      context: .
-      dockerfile: src/Schleusenwerk/Dockerfile
+    image: ghcr.io/st0o0/schleusenwerk:latest
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - db:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - certs:/certs
+      - data:/data
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - Cors__AllowedOrigins=http://localhost:3000
+      - DOMAINS=${DOMAINS}
+      - STAGE=${STAGE:-production}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - DNS_PROVIDER=${DNS_PROVIDER:-}
+    restart: unless-stopped
     networks:
       - schleusenwerk
 
   web:
-    build:
-      context: src/Schleusenwerk.Web
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:5000
+    image: ghcr.io/st0o0/schleusenwerk-web:latest
     ports:
       - "3000:3000"
+    restart: unless-stopped
     networks:
       - schleusenwerk
     depends_on:
       - proxy
 
 volumes:
-  db:
   certs:
+  data:
 
 networks:
   schleusenwerk:

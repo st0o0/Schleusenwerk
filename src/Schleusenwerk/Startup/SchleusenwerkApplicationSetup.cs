@@ -1,4 +1,5 @@
 using Schleusenwerk.Forwarding;
+using Schleusenwerk.Persistence;
 using Schleusenwerk.RateLimiting;
 using Servus.Core.Application.Startup;
 
@@ -8,7 +9,18 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
 {
     protected override void SetupApplication(WebApplication app)
     {
-        app.MapGet("/health", () => Results.Ok("healthy"));
+        app.MapGet("/health", async (IConfigurationStore store, CancellationToken ct) =>
+        {
+            try
+            {
+                await store.GetSettingsAsync(ct);
+                return Results.Ok("healthy");
+            }
+            catch
+            {
+                return Results.StatusCode(503);
+            }
+        });
 
         app.MapGet("/.well-known/acme-challenge/{token}", (string token, IConfiguration config) =>
         {

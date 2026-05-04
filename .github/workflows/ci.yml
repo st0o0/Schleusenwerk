@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, mvp]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore src/Schleusenwerk.slnx
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore src/Schleusenwerk.slnx
+
+      - name: Test
+        run: dotnet test --project src/Schleusenwerk.Tests/Schleusenwerk.Tests.csproj --no-build --configuration Release
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/Schleusenwerk.Web/package-lock.json
+
+      - name: TypeScript Check
+        working-directory: src/Schleusenwerk.Web
+        run: |
+          npm ci
+          npx vue-tsc --noEmit

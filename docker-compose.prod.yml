@@ -1,0 +1,36 @@
+services:
+  proxy:
+    image: ghcr.io/st0o0/schleusenwerk:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certs:/certs
+      - data:/data
+    environment:
+      - DOMAINS=${DOMAINS}
+      - STAGE=${STAGE:-production}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - DNS_PROVIDER=${DNS_PROVIDER:-}
+    restart: unless-stopped
+    networks:
+      - schleusenwerk
+
+  web:
+    image: ghcr.io/st0o0/schleusenwerk-web:latest
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - schleusenwerk
+    depends_on:
+      - proxy
+
+volumes:
+  certs:
+  data:
+
+networks:
+  schleusenwerk:
+    driver: bridge

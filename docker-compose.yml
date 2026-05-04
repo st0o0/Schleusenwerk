@@ -1,0 +1,38 @@
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: src/Schleusenwerk/Dockerfile
+    ports:
+      - "1312:80"
+      - "1313:443"
+      - "5000:5000"
+    volumes:
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - db:/data
+      - certs:/certs
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80;https://+:443;http://+:5000
+      - Cors__AllowedOrigins=http://localhost:3000
+    networks:
+      - schleusenwerk
+
+  web:
+    build:
+      context: src/Schleusenwerk.Web
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000"
+    networks:
+      - schleusenwerk
+    depends_on:
+      - proxy
+
+volumes:
+  db:
+  certs:
+
+networks:
+  schleusenwerk:
+    driver: bridge

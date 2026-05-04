@@ -1,0 +1,19 @@
+:3000 {
+	root * /srv
+	file_server
+	try_files {path} /index.html
+
+	handle /api/* {
+		reverse_proxy proxy:5000
+	}
+
+	handle /hubs/* {
+		reverse_proxy proxy:5000
+	}
+
+	handle /health {
+		respond "ok" 200
+	}
+
+	encode gzip zstd
+}

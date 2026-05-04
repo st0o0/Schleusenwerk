@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <ItemGroup>
+        <PackageReference Include="Akka.Streams" />
+        <PackageReference Include="Akka.Cluster.Hosting" />
+        <PackageReference Include="Akka.Persistence.Sql.Hosting" />
+        <PackageReference Include="Docker.DotNet" />
+        <PackageReference Include="Microsoft.Data.Sqlite" />
+        <PackageReference Include="TurboHTTP" />
+        <PackageReference Include="Servus.Akka" />
+        <PackageReference Include="Servus.Core" />
+        <PackageReference Include="OpenTelemetry.Api" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Schleusenwerk.Core\Schleusenwerk.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Schleusenwerk.Tests" />
+    </ItemGroup>
+
+</Project>

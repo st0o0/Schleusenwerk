@@ -1,0 +1,19 @@
+<Solution>
+  <Project Path="Schleusenwerk/Schleusenwerk.csproj" />
+  <Project Path="Schleusenwerk.Core/Schleusenwerk.Core.csproj" />
+  <Project Path="Schleusenwerk.Contracts/Schleusenwerk.Contracts.csproj" />
+  <Project Path="Schleusenwerk.AppHost/Schleusenwerk.AppHost.csproj" />
+  <Project Path="Schleusenwerk.IntegrationTests/Schleusenwerk.IntegrationTests.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path="../.dockerignore" />
+    <File Path="../.github/workflows/ci.yml" />
+    <File Path="../.gitignore" />
+    <File Path="../CLAUDE.md" />
+    <File Path="../docker-compose.yml" />
+    <File Path="../README.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+  </Folder>
+  <Project Path="Schleusenwerk.Tests/Schleusenwerk.Tests.csproj" />
+</Solution>

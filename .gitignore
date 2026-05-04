@@ -1,0 +1,61 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docuser
+
+## Visual Studio
+.vs/
+*.rsuser
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+packages.lock.json
+
+## Build results
+[Dd]ebugPublic/
+[Rr]eleases/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+
+## Rider
+.idea/
+
+## OS
+[Tt]humbs.db
+*.DS_Store
+
+## Docker
+**/docker-compose*.override.yml
+.maggus/runs
+.maggus/logs/
+.maggus/MEMORY.md
+.maggus/RELEASE_NOTES.md
+.maggus/usage*.csv
+.maggus/usage_*.jsonl
+.maggus/feature_approvals.yml
+.maggus/daemon.pid
+.maggus/interactive.lock
+.maggus/worktrees/
+COMMIT.md
+.worktrees/

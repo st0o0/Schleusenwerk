@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Hosting.AppHost" />
+        <PackageReference Include="Aspire.Hosting.Orchestration.win-x64" />
+        <PackageReference Include="Aspire.Dashboard.Sdk.win-x64" />
+    </ItemGroup>
+
+</Project>

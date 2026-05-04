@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/st0o0/Schleusenwerk/compare/v0.2.0...v0.2.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **docker:** reduce image size ([b841912](https://github.com/st0o0/Schleusenwerk/commit/b8419122c05e1ae4e6194bbabf1f8eec1b324d6f))
+
 ## [0.2.0](https://github.com/st0o0/Schleusenwerk/compare/v0.1.0...v0.2.0) (2026-05-04)
 
 

@@ -2,30 +2,52 @@ name: CI
 
 on:
   push:
-    branches: [main, mvp]
+    branches: [main]
   pull_request:
     branches: [main]
+
+env:
+  GLOBAL_JSON_PATH: "./src/global.json"
+  SOLUTION_PATH: "./src/Schleusenwerk.slnx"
+  TEST_OUTPUT_DIRECTORY: "${{ github.workspace }}/testresults"
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: ${{ env.GLOBAL_JSON_PATH }}
 
       - name: Restore
-        run: dotnet restore src/Schleusenwerk.slnx
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore src/Schleusenwerk.slnx
+        run: >
+          dotnet build
+          --configuration Release
+          --no-restore
+          ${{ env.SOLUTION_PATH }}
 
       - name: Test
-        run: dotnet test --project src/Schleusenwerk.Tests/Schleusenwerk.Tests.csproj --no-build --configuration Release
+        working-directory: "./src"
+        run: >
+          dotnet test
+          --configuration Release
+          --no-ansi
+          --no-build
+          --coverage
+          --coverage-output-format cobertura
+          --results-directory ${{ env.TEST_OUTPUT_DIRECTORY }}
+          --project ./Schleusenwerk.Tests/Schleusenwerk.Tests.csproj
 
       - name: Setup Node
         uses: actions/setup-node@v4

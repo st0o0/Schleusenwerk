@@ -45,9 +45,9 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             WebSocketEnabled = false,
         };
 
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
 
-        var result = await service.GetByDomainAsync(DomainName.Parse("ws-off.example.com"));
+        var result = await service.GetByDomainAsync(DomainName.Parse("ws-off.example.com"), TestContext.Current.CancellationToken);
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
         Assert.False(domainResult.Config.WebSocketEnabled);
     }
@@ -62,9 +62,9 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             WebSocketEnabled = true,
         };
 
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
 
-        var result = await service.GetByDomainAsync(DomainName.Parse("ws-on.example.com"));
+        var result = await service.GetByDomainAsync(DomainName.Parse("ws-on.example.com"), TestContext.Current.CancellationToken);
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
         Assert.True(domainResult.Config.WebSocketEnabled);
     }
@@ -78,12 +78,12 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             DomainName = DomainName.Parse("toggle.example.com"),
             WebSocketEnabled = false,
         };
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
 
         var updated = config with { WebSocketEnabled = true };
-        await service.UpdateDomainAsync(updated);
+        await service.UpdateDomainAsync(updated, TestContext.Current.CancellationToken);
 
-        var result = await service.GetByDomainAsync(DomainName.Parse("toggle.example.com"));
+        var result = await service.GetByDomainAsync(DomainName.Parse("toggle.example.com"), TestContext.Current.CancellationToken);
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
         Assert.True(domainResult.Config.WebSocketEnabled);
     }
@@ -97,12 +97,12 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             DomainName = DomainName.Parse("toggle-off.example.com"),
             WebSocketEnabled = true,
         };
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
 
         var updated = config with { WebSocketEnabled = false };
-        await service.UpdateDomainAsync(updated);
+        await service.UpdateDomainAsync(updated, TestContext.Current.CancellationToken);
 
-        var result = await service.GetByDomainAsync(DomainName.Parse("toggle-off.example.com"));
+        var result = await service.GetByDomainAsync(DomainName.Parse("toggle-off.example.com"), TestContext.Current.CancellationToken);
         var domainResult = ((ConfigurationResult<DomainConfigResult>.Success)result).Value;
         Assert.False(domainResult.Config.WebSocketEnabled);
     }
@@ -116,15 +116,16 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             DomainName = DomainName.Parse("resolve-ws.example.com"),
             WebSocketEnabled = true,
         };
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
         await service.AddUpstreamAsync(
             DomainName.Parse("resolve-ws.example.com"),
-            UpstreamTarget.Create("http://backend:8080"));
+            UpstreamTarget.Create("http://backend:8080"),
+            TestContext.Current.CancellationToken);
 
         var registry = ActorRegistry.For(Sys);
         var domainActor = registry.Get<DomainEntityActor>();
         var response = await domainActor.Ask<object>(
-            new ResolveUpstream("resolve-ws.example.com"), Timeout);
+            new ResolveUpstream("resolve-ws.example.com"), Timeout, TestContext.Current.CancellationToken);
 
         var resolved = Assert.IsType<UpstreamResolved>(response);
         Assert.True(resolved.Config.WebSocketEnabled);
@@ -138,15 +139,16 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
         {
             DomainName = DomainName.Parse("no-ws.example.com"),
         };
-        await service.AddDomainAsync(config);
+        await service.AddDomainAsync(config, TestContext.Current.CancellationToken);
         await service.AddUpstreamAsync(
             DomainName.Parse("no-ws.example.com"),
-            UpstreamTarget.Create("http://backend:8080"));
+            UpstreamTarget.Create("http://backend:8080"),
+            TestContext.Current.CancellationToken);
 
         var registry = ActorRegistry.For(Sys);
         var domainActor = registry.Get<DomainEntityActor>();
         var response = await domainActor.Ask<object>(
-            new ResolveUpstream("no-ws.example.com"), Timeout);
+            new ResolveUpstream("no-ws.example.com"), Timeout, TestContext.Current.CancellationToken);
 
         var resolved = Assert.IsType<UpstreamResolved>(response);
         Assert.False(resolved.Config.WebSocketEnabled);

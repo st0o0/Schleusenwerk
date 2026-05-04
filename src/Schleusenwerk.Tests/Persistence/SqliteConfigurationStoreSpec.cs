@@ -21,7 +21,7 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     [Fact(Timeout = 5000)]
     public async Task GetSettingsAsync_should_return_defaults_when_empty()
     {
-        var settings = await _store.GetSettingsAsync();
+        var settings = await _store.GetSettingsAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ProxySettings.Default.DefaultRequestTimeout, settings.DefaultRequestTimeout);
         Assert.Equal(ProxySettings.Default.MaxConnectionsPerUpstream, settings.MaxConnectionsPerUpstream);
@@ -38,8 +38,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             Stage = AcmeStage.Production,
         };
 
-        await _store.UpdateSettingsAsync(settings);
-        var result = await _store.GetSettingsAsync();
+        await _store.UpdateSettingsAsync(settings, TestContext.Current.CancellationToken);
+        var result = await _store.GetSettingsAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result.ForceHttpsGlobally);
         Assert.Equal(50, result.MaxConnectionsPerUpstream);
@@ -49,10 +49,10 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     [Fact(Timeout = 5000)]
     public async Task UpdateSettingsAsync_should_overwrite_existing()
     {
-        await _store.UpdateSettingsAsync(new ProxySettings { ForceHttpsGlobally = true });
-        await _store.UpdateSettingsAsync(new ProxySettings { ForceHttpsGlobally = false, MaxConnectionsPerUpstream = 25 });
+        await _store.UpdateSettingsAsync(new ProxySettings { ForceHttpsGlobally = true }, TestContext.Current.CancellationToken);
+        await _store.UpdateSettingsAsync(new ProxySettings { ForceHttpsGlobally = false, MaxConnectionsPerUpstream = 25 }, TestContext.Current.CancellationToken);
 
-        var result = await _store.GetSettingsAsync();
+        var result = await _store.GetSettingsAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result.ForceHttpsGlobally);
         Assert.Equal(25, result.MaxConnectionsPerUpstream);
@@ -61,7 +61,7 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     [Fact(Timeout = 5000)]
     public async Task GetAllDomainsAsync_should_return_empty_initially()
     {
-        var domains = await _store.GetAllDomainsAsync();
+        var domains = await _store.GetAllDomainsAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(domains);
     }
@@ -71,8 +71,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     {
         var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
 
-        await _store.UpsertDomainAsync(config);
-        var domains = await _store.GetAllDomainsAsync();
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
+        var domains = await _store.GetAllDomainsAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(domains);
         Assert.Equal("example.com", domains[0].DomainName.Value);
@@ -82,12 +82,12 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     public async Task UpsertDomainAsync_should_update_existing_domain()
     {
         var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
-        await _store.UpsertDomainAsync(config);
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
 
         var updated = config with { ForceHttps = true };
-        await _store.UpsertDomainAsync(updated);
+        await _store.UpsertDomainAsync(updated, TestContext.Current.CancellationToken);
 
-        var result = await _store.GetDomainAsync(DomainName.Parse("example.com"));
+        var result = await _store.GetDomainAsync(DomainName.Parse("example.com"), TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.True(result.ForceHttps);
     }
@@ -95,7 +95,7 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     [Fact(Timeout = 5000)]
     public async Task GetDomainAsync_should_return_null_for_missing()
     {
-        var result = await _store.GetDomainAsync(DomainName.Parse("missing.com"));
+        var result = await _store.GetDomainAsync(DomainName.Parse("missing.com"), TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }
@@ -104,11 +104,11 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     public async Task RemoveDomainAsync_should_delete_domain()
     {
         var config = new DomainConfig { DomainName = DomainName.Parse("example.com") };
-        await _store.UpsertDomainAsync(config);
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
 
-        await _store.RemoveDomainAsync(DomainName.Parse("example.com"));
+        await _store.RemoveDomainAsync(DomainName.Parse("example.com"), TestContext.Current.CancellationToken);
 
-        var domains = await _store.GetAllDomainsAsync();
+        var domains = await _store.GetAllDomainsAsync(TestContext.Current.CancellationToken);
         Assert.Empty(domains);
     }
 
@@ -126,8 +126,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             RequestTimeout = TimeSpan.FromSeconds(60),
         };
 
-        await _store.UpsertDomainAsync(config);
-        var result = await _store.GetDomainAsync(DomainName.Parse("example.com"));
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
+        var result = await _store.GetDomainAsync(DomainName.Parse("example.com"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(RedirectMode.PermanentRedirect, result.HttpRedirect);
@@ -147,8 +147,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             WebSocketEnabled = false,
         };
 
-        await _store.UpsertDomainAsync(config);
-        var result = await _store.GetDomainAsync(DomainName.Parse("no-ws.com"));
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
+        var result = await _store.GetDomainAsync(DomainName.Parse("no-ws.com"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.False(result.WebSocketEnabled);
@@ -163,8 +163,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             WebSocketEnabled = true,
         };
 
-        await _store.UpsertDomainAsync(config);
-        var result = await _store.GetDomainAsync(DomainName.Parse("ws.com"));
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
+        var result = await _store.GetDomainAsync(DomainName.Parse("ws.com"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.True(result.WebSocketEnabled);
@@ -178,10 +178,10 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
             DomainName = DomainName.Parse("toggle-ws.com"),
             WebSocketEnabled = false,
         };
-        await _store.UpsertDomainAsync(config);
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
 
-        await _store.UpsertDomainAsync(config with { WebSocketEnabled = true });
-        var result = await _store.GetDomainAsync(DomainName.Parse("toggle-ws.com"));
+        await _store.UpsertDomainAsync(config with { WebSocketEnabled = true }, TestContext.Current.CancellationToken);
+        var result = await _store.GetDomainAsync(DomainName.Parse("toggle-ws.com"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.True(result.WebSocketEnabled);
@@ -192,8 +192,8 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     {
         var config = new DomainConfig { DomainName = DomainName.Parse("*.example.com") };
 
-        await _store.UpsertDomainAsync(config);
-        var result = await _store.GetDomainAsync(DomainName.Parse("*.example.com"));
+        await _store.UpsertDomainAsync(config, TestContext.Current.CancellationToken);
+        var result = await _store.GetDomainAsync(DomainName.Parse("*.example.com"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.True(result.DomainName.IsWildcard);
@@ -202,11 +202,11 @@ public sealed class SqliteConfigurationStoreSpec : IDisposable
     [Fact(Timeout = 5000)]
     public async Task GetAllDomainsAsync_should_return_multiple_domains()
     {
-        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("a.com") });
-        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("b.com") });
-        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("c.com") });
+        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("a.com") }, TestContext.Current.CancellationToken);
+        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("b.com") }, TestContext.Current.CancellationToken);
+        await _store.UpsertDomainAsync(new DomainConfig { DomainName = DomainName.Parse("c.com") }, TestContext.Current.CancellationToken);
 
-        var domains = await _store.GetAllDomainsAsync();
+        var domains = await _store.GetAllDomainsAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, domains.Count);
     }

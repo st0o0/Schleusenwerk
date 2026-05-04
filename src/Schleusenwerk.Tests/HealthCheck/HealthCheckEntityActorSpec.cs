@@ -50,7 +50,7 @@ public sealed class HealthCheckEntityActorSpec : TestKit
     {
         var actor = CreateActor();
 
-        var status = await actor.Ask<HealthStatus>(GetHealthStatus.Instance, AskTimeout);
+        var status = await actor.Ask<HealthStatus>(GetHealthStatus.Instance, AskTimeout, TestContext.Current.CancellationToken);
 
         Assert.True(status.IsHealthy);
     }
@@ -85,7 +85,7 @@ public sealed class HealthCheckEntityActorSpec : TestKit
 
         // Trigger a manual check — subscriber should not receive the event
         actor.Tell(CheckHealth.Instance);
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
 
         probe.ExpectNoMsg(TimeSpan.FromMilliseconds(500));
     }
@@ -104,13 +104,13 @@ public sealed class HealthCheckEntityActorSpec : TestKit
 
         var subscriberActor = Sys.ActorOf(Props.Create<BlackHoleActor>());
         actor.Tell(new SubscribeHealth(subscriberActor) { Url = "http://backend:8080/" });
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         Sys.Stop(subscriberActor);
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
 
         // Actor should not crash when broadcasting after subscriber terminated
-        var status = await actor.Ask<HealthStatus>(GetHealthStatus.Instance, AskTimeout);
+        var status = await actor.Ask<HealthStatus>(GetHealthStatus.Instance, AskTimeout, TestContext.Current.CancellationToken);
         Assert.NotNull(status);
     }
 

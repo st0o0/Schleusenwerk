@@ -106,7 +106,7 @@ public sealed class CertificateController : ControllerBase
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (extension is ".pfx" or ".p12")
         {
-            return new X509Certificate2(bytes, password, X509KeyStorageFlags.Exportable);
+            return X509CertificateLoader.LoadPkcs12(bytes, password, X509KeyStorageFlags.Exportable);
         }
 
         var certPem = System.Text.Encoding.UTF8.GetString(bytes);

@@ -21,7 +21,7 @@ public sealed class FileCertificateStore : ICertificateStore
             return null;
         }
 
-        return new X509Certificate2(path, (string?)null, X509KeyStorageFlags.Exportable);
+        return X509CertificateLoader.LoadPkcs12FromFile(path, null, X509KeyStorageFlags.Exportable);
     }
 
     public void StoreCertificate(DomainName domain, X509Certificate2 certificate)

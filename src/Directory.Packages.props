@@ -23,6 +23,9 @@
     <ItemGroup Label="Docker">
         <PackageVersion Include="Docker.DotNet" Version="3.125.15"/>
     </ItemGroup>
+    <ItemGroup Label="Telemetry">
+        <PackageVersion Include="OpenTelemetry.Api" Version="1.12.0"/>
+    </ItemGroup>
     <ItemGroup Label="Testing">
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.5.2"/>
         <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2"/>

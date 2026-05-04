@@ -3,6 +3,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!-- OpenTelemetry.Api advisory GHSA-g94r-2vxg-569j affects all versions, no fix available yet -->
+        <NoWarn>$(NoWarn);NU1902;xUnit1051</NoWarn>
     </PropertyGroup>
 
     <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">

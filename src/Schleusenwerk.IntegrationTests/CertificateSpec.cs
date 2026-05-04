@@ -14,9 +14,9 @@ public sealed class CertificateSpec
     [Fact(Timeout = 30_000)]
     public async Task ListCertificates_should_return_empty_initially()
     {
-        var response = await _client.GetAsync("/api/certificates");
+        var response = await _client.GetAsync("/api/certificates", TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Equal(JsonValueKind.Array, JsonSerializer.Deserialize<JsonElement>(json).ValueKind);
     }
 
@@ -24,10 +24,10 @@ public sealed class CertificateSpec
     public async Task ProvisionCertificate_should_trigger_selfsigned()
     {
         var domain = $"cert-{Guid.NewGuid():N}.test";
-        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"));
-        var response = await _client.PostAsync($"/api/certificates/{domain}/provision", null);
+        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        var response = await _client.PostAsync($"/api/certificates/{domain}/provision", null, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(JsonSerializer.Deserialize<JsonElement>(json).GetProperty("success").GetBoolean());
     }
 
@@ -35,12 +35,12 @@ public sealed class CertificateSpec
     public async Task ListCertificates_should_contain_provisioned_cert()
     {
         var domain = $"cert-list-{Guid.NewGuid():N}.test";
-        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"));
-        await _client.PostAsync($"/api/certificates/{domain}/provision", null);
-        await Task.Delay(2000);
-        var response = await _client.GetAsync("/api/certificates");
-        var json = await response.Content.ReadAsStringAsync();
+        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30 }), Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        await _client.PostAsync($"/api/certificates/{domain}/provision", null, TestContext.Current.CancellationToken);
+        await Task.Delay(2000, TestContext.Current.CancellationToken);
+        var response = await _client.GetAsync("/api/certificates", TestContext.Current.CancellationToken);
+        var json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var certs = JsonSerializer.Deserialize<JsonElement>(json);
-        Assert.True(certs.EnumerateArray().Any(c => c.GetProperty("domain").GetString() == domain));
+        Assert.Contains(certs.EnumerateArray(), c => c.GetProperty("domain").GetString() == domain);
     }
 }

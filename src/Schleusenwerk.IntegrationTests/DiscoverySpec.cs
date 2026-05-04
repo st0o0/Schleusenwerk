@@ -13,8 +13,8 @@ public sealed class DiscoverySpec
     [Fact(Timeout = 30_000)]
     public async Task ListContainers_should_return_ok()
     {
-        var response = await _client.GetAsync("/api/discovery/containers");
+        var response = await _client.GetAsync("/api/discovery/containers", TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        Assert.Equal(JsonValueKind.Array, JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync()).ValueKind);
+        Assert.Equal(JsonValueKind.Array, JsonSerializer.Deserialize<JsonElement>(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ValueKind);
     }
 }

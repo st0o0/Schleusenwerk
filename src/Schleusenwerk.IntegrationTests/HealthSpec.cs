@@ -14,9 +14,9 @@ public sealed class HealthSpec
     [Fact(Timeout = 30_000)]
     public async Task GetHealth_should_return_counts()
     {
-        var response = await _client.GetAsync("/api/health");
+        var response = await _client.GetAsync("/api/health", TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var health = JsonSerializer.Deserialize<JsonElement>(json);
         Assert.True(health.TryGetProperty("routeCount", out _));
         Assert.True(health.TryGetProperty("healthyCount", out _));
@@ -27,10 +27,10 @@ public sealed class HealthSpec
     public async Task GetUpstreamHealth_should_return_entries_for_domain()
     {
         var domain = $"health-{Guid.NewGuid():N}.test";
-        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30, firstUpstreamUrl = "http://backend:8080" }), Encoding.UTF8, "application/json"));
-        var response = await _client.GetAsync($"/api/health/{domain}");
+        await _client.PostAsync("/api/routes", new StringContent(JsonSerializer.Serialize(new { domain, timeoutSeconds = 30, firstUpstreamUrl = "http://backend:8080" }), Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        var response = await _client.GetAsync($"/api/health/{domain}", TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var health = JsonSerializer.Deserialize<JsonElement>(json);
         Assert.Equal(domain, health.GetProperty("domain").GetString());
         Assert.Equal(JsonValueKind.Array, health.GetProperty("upstreams").ValueKind);

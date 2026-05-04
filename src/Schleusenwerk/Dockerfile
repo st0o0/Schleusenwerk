@@ -1,18 +1,23 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 
 WORKDIR /build
 
+COPY src/Directory.Build.props src/Directory.Packages.props* src/
+COPY src/Schleusenwerk/Schleusenwerk.csproj src/Schleusenwerk/
+COPY src/Schleusenwerk.Core/Schleusenwerk.Core.csproj src/Schleusenwerk.Core/
+
+RUN dotnet restore ./src/Schleusenwerk/Schleusenwerk.csproj
+
 COPY src/ ./src/
 
-RUN dotnet restore ./src/Schleusenwerk/Schleusenwerk.csproj && \
-    dotnet publish ./src/Schleusenwerk/Schleusenwerk.csproj \
+RUN dotnet publish ./src/Schleusenwerk/Schleusenwerk.csproj \
         --configuration Release \
         --output /app \
         --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libgcc libstdc++
 
 COPY --from=goacme/lego /lego /usr/local/bin/lego
 
@@ -33,7 +38,7 @@ EXPOSE 80 443 5000
 VOLUME ["/data", "/certs"]
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -sf http://localhost:5000/api/health || exit 1
+    CMD wget -qO- http://localhost:5000/api/health || exit 1
 
 USER app
 

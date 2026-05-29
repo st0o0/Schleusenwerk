@@ -25,19 +25,13 @@ public sealed class CircuitBreakerSpec
 
         try
         {
-            var conn = _toxiproxy.CreateConnection();
-            var client = conn.Client();
-            var proxy = client.FindProxy("echo");
-
-            // Disable the proxy to simulate upstream failures
-            proxy.Enabled = false;
-            proxy.Update();
+            using var toxiClient = _toxiproxy.CreateClient();
+            await toxiClient.DisableProxyAsync("echo", ct);
 
             using var proxyClient = TestHelper.CreateProxyClient(_host.BaseUri, domain);
 
-            // Send multiple requests to trigger circuit breaker
-            int badGatewayCount = 0;
-            for (int i = 0; i < 5; i++)
+            var badGatewayCount = 0;
+            for (var i = 0; i < 5; i++)
             {
                 var response = await proxyClient.GetAsync("/", ct);
                 if (response.StatusCode == HttpStatusCode.BadGateway)
@@ -46,12 +40,11 @@ public sealed class CircuitBreakerSpec
                 }
             }
 
-            // Should get 502 errors when upstream is down
             Assert.True(badGatewayCount > 0, "Expected at least one 502 Bad Gateway response");
         }
         finally
         {
-            _toxiproxy.Reset();
+            await _toxiproxy.ResetAsync(ct);
         }
     }
 
@@ -64,42 +57,29 @@ public sealed class CircuitBreakerSpec
 
         try
         {
-            var conn = _toxiproxy.CreateConnection();
-            var client = conn.Client();
-            var proxy = client.FindProxy("echo");
-
-            // Disable the proxy to simulate upstream failures
-            proxy.Enabled = false;
-            proxy.Update();
+            using var toxiClient = _toxiproxy.CreateClient();
+            await toxiClient.DisableProxyAsync("echo", ct);
 
             using var proxyClient = TestHelper.CreateProxyClient(_host.BaseUri, domain);
 
-            // Send requests to trigger circuit breaker
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 await proxyClient.GetAsync("/", ct);
             }
 
-            // Re-enable the proxy to simulate recovery
-            proxy.Enabled = true;
-            proxy.Update();
+            await toxiClient.EnableProxyAsync("echo", ct);
 
-            // Wait for health checks to recognize the recovery (health check interval ~5-10 seconds)
             var isHealthy = await TestHelper.WaitForHealthyAsync(
-                _host.Client,
-                domain,
-                TimeSpan.FromSeconds(30),
-                ct: ct);
+                _host.Client, domain, TimeSpan.FromSeconds(30), ct);
 
             Assert.True(isHealthy, "Upstream should become healthy after recovery");
 
-            // Now send requests again and verify they succeed
             var response = await proxyClient.GetAsync("/", ct);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
         finally
         {
-            _toxiproxy.Reset();
+            await _toxiproxy.ResetAsync(ct);
         }
     }
 }

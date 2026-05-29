@@ -8,11 +8,13 @@ namespace Schleusenwerk.IntegrationTests.Resilience;
 public sealed class UpstreamFailoverSpec
 {
     private readonly SchleusenwerkTestHost _host;
+    private readonly EchoServerFixture _echo;
     private readonly ToxiproxyFixture _toxiproxy;
 
-    public UpstreamFailoverSpec(SchleusenwerkTestHost host, ToxiproxyFixture toxiproxy)
+    public UpstreamFailoverSpec(SchleusenwerkTestHost host, EchoServerFixture echo, ToxiproxyFixture toxiproxy)
     {
         _host = host;
+        _echo = echo;
         _toxiproxy = toxiproxy;
     }
 
@@ -21,65 +23,37 @@ public sealed class UpstreamFailoverSpec
     {
         var ct = TestContext.Current.CancellationToken;
         var domain = TestHelper.UniqueDomain("failover");
+        await TestHelper.RegisterRouteAsync(_host.Client, domain, _echo.BaseUrl, ct: ct);
+        await TestHelper.AddUpstreamAsync(_host.Client, domain, _toxiproxy.ProxyUrl, ct);
 
-        // Register route with first upstream pointing to echo server (via toxiproxy)
-        await TestHelper.RegisterRouteAsync(_host.Client, domain, _toxiproxy.ProxyUrl, ct: ct);
-
-        // Add a second upstream that is unavailable (to test failover logic)
-        // Use a non-routable address that will fail quickly
-        await TestHelper.AddUpstreamAsync(_host.Client, domain, "http://localhost:19999", ct: ct);
+        await TestHelper.WaitForHealthyAsync(_host.Client, domain, TimeSpan.FromSeconds(60), ct);
 
         try
         {
-            // Wait for all upstreams to be probed and healthy ones identified
-            var isHealthy = await TestHelper.WaitForHealthyAsync(
-                _host.Client,
-                domain,
-                TimeSpan.FromSeconds(30),
-                ct: ct);
+            using var toxiClient = _toxiproxy.CreateClient();
+            await toxiClient.DisableProxyAsync("echo", ct);
 
-            Assert.True(isHealthy, "At least one upstream should become healthy");
-
-            // Now disable the primary upstream to force failover
-            var conn = _toxiproxy.CreateConnection();
-            var client = conn.Client();
-            var proxy = client.FindProxy("echo");
-            proxy.Enabled = false;
-            proxy.Update();
-
-            // Wait a bit for the proxy to mark the upstream as unhealthy
-            await Task.Delay(3000, ct);
+            await Task.Delay(10_000, ct);
 
             using var proxyClient = TestHelper.CreateProxyClient(_host.BaseUri, domain);
-
-            // Send multiple requests - with the primary upstream down,
-            // the second upstream (local:19999) should still fail for those requests
-            // But the proxy should still respond (either 502 or attempt to route to available upstream)
-            int successCount = 0;
-            int failureCount = 0;
-
-            for (int i = 0; i < 5; i++)
+            var successCount = 0;
+            for (var i = 0; i < 5; i++)
             {
                 var response = await proxyClient.GetAsync("/", ct);
-                if (response.IsSuccessStatusCode)
+                if (response.StatusCode == HttpStatusCode.OK)
                 {
                     successCount++;
                 }
-                else
-                {
-                    failureCount++;
-                }
+
+                await Task.Delay(500, ct);
             }
 
-            // Since both upstreams are either down or unavailable, we expect failures
-            // But the point of this test is that the proxy continues to attempt routing
-            // (doesn't hang or circuit-break completely)
-            Assert.True(successCount + failureCount >= 5, "Proxy should attempt all requests");
+            Assert.True(successCount >= 3,
+                $"Expected most requests to succeed via healthy upstream, got {successCount}/5");
         }
         finally
         {
-            _toxiproxy.Reset();
-            await TestHelper.RemoveRouteAsync(_host.Client, domain, ct: ct);
+            await _toxiproxy.ResetAsync(ct);
         }
     }
 }

@@ -1,6 +1,5 @@
 using System.Net;
 using Schleusenwerk.IntegrationTests.Infrastructure;
-using Toxiproxy.Net.Toxics;
 using Xunit;
 
 namespace Schleusenwerk.IntegrationTests.Forwarding;
@@ -37,18 +36,8 @@ public sealed class ConnectionErrorSpec
 
         try
         {
-            var conn = _toxiproxy.CreateConnection();
-            var client = conn.Client();
-            var proxy = client.FindProxy("echo");
-
-            // Add slow_close toxic to simulate connection issues
-            var slowCloseToxic = new SlowCloseToxic
-            {
-                Name = "slowclose",
-                Stream = ToxicDirection.UpStream,
-                Attributes = new SlowCloseToxic.ToxicAttributes { Delay = 5000 }
-            };
-            proxy.Add(slowCloseToxic);
+            using var client = _toxiproxy.CreateClient();
+            await client.AddResetPeerAsync("echo", "reset", ct: ct);
 
             using var proxyClient = TestHelper.CreateProxyClient(_host.BaseUri, domain);
             var response = await proxyClient.GetAsync("/", ct);
@@ -56,7 +45,7 @@ public sealed class ConnectionErrorSpec
         }
         finally
         {
-            _toxiproxy.Reset();
+            await _toxiproxy.ResetAsync(ct);
         }
     }
 }

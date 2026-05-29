@@ -19,14 +19,14 @@ public sealed class SettingsSpec
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(ct);
         var settings = JsonSerializer.Deserialize<JsonElement>(json);
-        Assert.True(settings.TryGetProperty("acmeStage", out _));
+        Assert.True(settings.TryGetProperty("stage", out _));
     }
 
     [Fact(Timeout = 30_000)]
     public async Task Should_update_settings()
     {
         var ct = TestContext.Current.CancellationToken;
-        var body = JsonSerializer.Serialize(new { acmeStage = "staging" });
+        var body = JsonSerializer.Serialize(new { stage = "staging" });
         var response = await _client.PutAsync("/api/settings", new StringContent(body, Encoding.UTF8, "application/json"), ct);
         response.EnsureSuccessStatusCode();
     }
@@ -35,11 +35,11 @@ public sealed class SettingsSpec
     public async Task Settings_should_persist_across_reads()
     {
         var ct = TestContext.Current.CancellationToken;
-        var body = JsonSerializer.Serialize(new { acmeStage = "local" });
+        var body = JsonSerializer.Serialize(new { stage = "local" });
         await _client.PutAsync("/api/settings", new StringContent(body, Encoding.UTF8, "application/json"), ct);
         var response = await _client.GetAsync("/api/settings", ct);
         var json = await response.Content.ReadAsStringAsync(ct);
         var settings = JsonSerializer.Deserialize<JsonElement>(json);
-        Assert.Equal("local", settings.GetProperty("acmeStage").GetString());
+        Assert.Equal("local", settings.GetProperty("stage").GetString());
     }
 }

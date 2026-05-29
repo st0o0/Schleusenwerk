@@ -36,9 +36,13 @@ public sealed class HealthEndpointSpec
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task Health_endpoint_should_return_404_for_unknown_domain()
+    public async Task Health_endpoint_should_return_empty_upstreams_for_unknown_domain()
     {
-        var response = await _client.GetAsync("/api/health/nonexistent.test", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.GetAsync("/api/health/nonexistent.test", ct);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var health = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.Equal(0, health.GetProperty("upstreams").GetArrayLength());
     }
 }

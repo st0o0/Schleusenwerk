@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Text.Json;
 using Schleusenwerk.IntegrationTests.Infrastructure;
 using Xunit;
 
@@ -44,8 +46,12 @@ public sealed class CertificateUploadSpec
         var certPem = cert.ExportCertificatePem();
         var keyPem = rsa.ExportRSAPrivateKeyPem();
         using var content = new MultipartFormDataContent();
-        content.Add(new StringContent(certPem), "cert");
-        content.Add(new StringContent(keyPem), "key");
+        var certContent = new ByteArrayContent(Encoding.UTF8.GetBytes(certPem));
+        certContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-pem-file");
+        content.Add(certContent, "file", "cert.pem");
+        var keyContent = new ByteArrayContent(Encoding.UTF8.GetBytes(keyPem));
+        keyContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-pem-file");
+        content.Add(keyContent, "keyFile", "key.pem");
         var response = await _client.PostAsync($"/api/certificates/{domain}/upload", content, ct);
         Assert.True(response.IsSuccessStatusCode, $"Expected success, got {response.StatusCode}");
     }
@@ -61,8 +67,13 @@ public sealed class CertificateUploadSpec
         using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(1));
         var certPem = cert.ExportCertificatePem();
         using var content = new MultipartFormDataContent();
-        content.Add(new StringContent(certPem), "cert");
+        var certContent = new ByteArrayContent(Encoding.UTF8.GetBytes(certPem));
+        certContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-pem-file");
+        content.Add(certContent, "file", "cert.pem");
         var response = await _client.PostAsync($"/api/certificates/{domain}/upload", content, ct);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var result = JsonSerializer.Deserialize<JsonElement>(json);
+        Assert.False(result.GetProperty("success").GetBoolean());
     }
 }

@@ -1,72 +1,37 @@
-using Aspire.Hosting;
-using Aspire.Hosting.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
+using Schleusenwerk.IntegrationTests.Infrastructure;
 using Xunit;
 
 namespace Schleusenwerk.IntegrationTests;
 
+/// <summary>
+/// Fixture wrapper that uses SchleusenwerkTestHost internally.
+/// This maintains API compatibility with existing tests while transitioning to in-process testing.
+/// </summary>
 public sealed class SchleusenwerkFixture : IAsyncLifetime
 {
-    public DistributedApplication App { get; private set; } = null!;
-    public HttpClient Client { get; private set; } = null!;
-    public Uri ApiBaseUri { get; private set; } = null!;
+    private SchleusenwerkTestHost? _host;
+
+    public HttpClient Client => _host?.Client ?? throw new InvalidOperationException("Host not initialized");
+    public Uri ApiBaseUri => _host?.BaseUri ?? throw new InvalidOperationException("Host not initialized");
 
     public async ValueTask InitializeAsync()
     {
-        var builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.Schleusenwerk_AppHost>();
-
-        App = await builder.BuildAsync();
-
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-        await App.StartAsync(cts.Token);
-
-        ApiBaseUri = App.GetEndpoint("proxy", "api");
-        Client = new HttpClient { BaseAddress = ApiBaseUri };
-
-        await WaitForReady(cts.Token);
+        _host = new SchleusenwerkTestHost();
+        await _host.InitializeAsync();
     }
 
     public HubConnection CreateHubConnection()
     {
-        return new HubConnectionBuilder()
-            .WithUrl(new Uri(ApiBaseUri, "/hubs/events"))
-            .Build();
+        return _host?.CreateHubConnection() ?? throw new InvalidOperationException("Host not initialized");
     }
 
     public async ValueTask DisposeAsync()
     {
-        Client.Dispose();
-        await App.StopAsync();
-        await App.DisposeAsync();
-    }
-
-    private async Task WaitForReady(CancellationToken ct)
-    {
-        Exception? lastException = null;
-        int lastStatusCode = 0;
-
-        while (!ct.IsCancellationRequested)
+        if (_host != null)
         {
-            try
-            {
-                var response = await Client.GetAsync("/api/health", ct);
-                lastStatusCode = (int)response.StatusCode;
-                if (response.IsSuccessStatusCode)
-                {
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-            }
-
-            await Task.Delay(2000, ct);
+            await _host.DisposeAsync();
         }
-
-        throw new TimeoutException(
-            $"Proxy did not become ready. BaseAddress={Client.BaseAddress}, LastStatus={lastStatusCode}, LastError={lastException?.Message}");
     }
 }
 

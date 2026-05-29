@@ -1,0 +1,68 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using Schleusenwerk.IntegrationTests.Infrastructure;
+using Xunit;
+
+namespace Schleusenwerk.IntegrationTests.Certificates;
+
+[Collection("Integration")]
+public sealed class CertificateUploadSpec
+{
+    private readonly HttpClient _client;
+    public CertificateUploadSpec(SchleusenwerkTestHost host) => _client = host.Client;
+
+    [Fact(Timeout = 30_000)]
+    public async Task Should_accept_pfx_certificate_upload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var domain = TestHelper.UniqueDomain("cert-pfx");
+        await TestHelper.RegisterRouteAsync(_client, domain, "http://backend:8080", ct: ct);
+        using var rsa = RSA.Create(2048);
+        var req = new CertificateRequest($"CN={domain}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(1));
+        var pfxBytes = cert.Export(X509ContentType.Pfx, "testpassword");
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(pfxBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/x-pkcs12");
+        content.Add(fileContent, "file", $"{domain}.pfx");
+        content.Add(new StringContent("testpassword"), "password");
+        var response = await _client.PostAsync($"/api/certificates/{domain}/upload", content, ct);
+        Assert.True(response.IsSuccessStatusCode, $"Expected success, got {response.StatusCode}");
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Should_accept_pem_certificate_upload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var domain = TestHelper.UniqueDomain("cert-pem");
+        await TestHelper.RegisterRouteAsync(_client, domain, "http://backend:8080", ct: ct);
+        using var rsa = RSA.Create(2048);
+        var req = new CertificateRequest($"CN={domain}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(1));
+        var certPem = cert.ExportCertificatePem();
+        var keyPem = rsa.ExportRSAPrivateKeyPem();
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(certPem), "cert");
+        content.Add(new StringContent(keyPem), "key");
+        var response = await _client.PostAsync($"/api/certificates/{domain}/upload", content, ct);
+        Assert.True(response.IsSuccessStatusCode, $"Expected success, got {response.StatusCode}");
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Should_reject_cert_without_private_key()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var domain = TestHelper.UniqueDomain("cert-nokey");
+        await TestHelper.RegisterRouteAsync(_client, domain, "http://backend:8080", ct: ct);
+        using var rsa = RSA.Create(2048);
+        var req = new CertificateRequest($"CN={domain}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(1));
+        var certPem = cert.ExportCertificatePem();
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(certPem), "cert");
+        var response = await _client.PostAsync($"/api/certificates/{domain}/upload", content, ct);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}

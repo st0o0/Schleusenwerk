@@ -67,13 +67,18 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
                 RememberEntities = false
             });
 
+        var dockerEnabled = configuration.GetValue("Docker:Enabled", true);
+
         builder.WithActors((system, registry, resolver) =>
         {
             var eventHub = system.ActorOf(resolver.Props<EventHub>(), "eventHub");
             registry.Register<EventHub>(eventHub);
 
-            var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
-            registry.Register<DockerDiscoveryActor>(dockerDiscovery);
+            if (dockerEnabled)
+            {
+                var dockerDiscovery = system.ActorOf(resolver.Props<DockerDiscoveryActor>(), "docker-discovery");
+                registry.Register<DockerDiscoveryActor>(dockerDiscovery);
+            }
 
             var certProvisioning = system.ResolveActor<CertificateProvisioningActor>("cert-provisioning");
             registry.Register<CertificateProvisioningActor>(certProvisioning);

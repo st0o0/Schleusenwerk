@@ -13,7 +13,9 @@ public sealed record RouteDefinition
     public static RouteDefinition Create(DomainConfig config, IReadOnlyList<UpstreamTarget> upstreams)
     {
         if (upstreams.Count == 0)
+        {
             throw new ArgumentException("At least one upstream target is required.", nameof(upstreams));
+        }
 
         return new RouteDefinition
         {

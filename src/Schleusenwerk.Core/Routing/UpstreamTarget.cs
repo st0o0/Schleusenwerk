@@ -15,10 +15,14 @@ public sealed record UpstreamTarget
     public static UpstreamTarget Create(string url, int weight = 1, int maxConnections = 100)
     {
         if (weight < 1)
+        {
             throw new ArgumentOutOfRangeException(nameof(weight), "Weight must be at least 1.");
+        }
 
         if (maxConnections < 1)
+        {
             throw new ArgumentOutOfRangeException(nameof(maxConnections), "MaxConnections must be at least 1.");
+        }
 
         return new UpstreamTarget
         {

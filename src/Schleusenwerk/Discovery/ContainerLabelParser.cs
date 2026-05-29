@@ -109,7 +109,9 @@ public static class ContainerLabelParser
     internal static TimeSpan? ParseDuration(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
+        {
             return null;
+        }
 
         var s = input.Trim();
         double totalSeconds = 0;
@@ -122,10 +124,14 @@ public static class ContainerLabelParser
                 j++;
 
             if (j == i || j >= s.Length)
+            {
                 return null;
+            }
 
             if (!double.TryParse(s[i..j], out var value))
+            {
                 return null;
+            }
 
             var unit = s[j];
             totalSeconds += unit switch
@@ -137,7 +143,9 @@ public static class ContainerLabelParser
             };
 
             if (totalSeconds < 0)
+            {
                 return null;
+            }
 
             i = j + 1;
         }

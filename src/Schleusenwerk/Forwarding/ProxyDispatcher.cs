@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Akka.Actor;
 using Akka.Hosting;
 using Schleusenwerk.Metrics;
@@ -95,7 +96,7 @@ internal sealed class ProxyDispatcher : IProxyDispatcher
             return;
         }
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var sw = Stopwatch.StartNew();
         await _pipeline.ForwardAsync(context, upstream, config, _headerFilter);
         sw.Stop();
         _metrics.RecordDuration(domain, upstream.Url.Value.ToString(), sw.Elapsed.TotalMilliseconds);

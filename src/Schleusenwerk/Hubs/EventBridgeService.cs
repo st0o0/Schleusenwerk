@@ -10,18 +10,18 @@ namespace Schleusenwerk.Hubs;
 
 internal sealed class EventBridgeService : BackgroundService
 {
-    private readonly IReadOnlyActorRegistry _registry;
+    private readonly IRequiredActor<EventHub> _eventHubProvider;
     private readonly IMaterializer _materializer;
     private readonly IHubContext<ProxyEventHub> _hub;
     private readonly ILogger<EventBridgeService> _logger;
 
     public EventBridgeService(
-        IReadOnlyActorRegistry registry,
+        IRequiredActor<EventHub> eventHubProvider,
         IMaterializer materializer,
         IHubContext<ProxyEventHub> hub,
         ILogger<EventBridgeService> logger)
     {
-        _registry = registry;
+        _eventHubProvider = eventHubProvider;
         _materializer = materializer;
         _hub = hub;
         _logger = logger;
@@ -51,7 +51,7 @@ internal sealed class EventBridgeService : BackgroundService
 
     private async Task StreamEventsAsync(CancellationToken ct)
     {
-        var eventHub = _registry.Get<EventHub>();
+        var eventHub = _eventHubProvider.ActorRef;
         var subscribed = await eventHub.Ask<EventHub.Subscribed>(
             EventHub.Subscribe.Instance, TimeSpan.FromSeconds(5), ct);
 

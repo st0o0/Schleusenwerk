@@ -9,6 +9,8 @@ public sealed record UpstreamResolved(UpstreamTarget Target, DomainConfig Config
 
 public sealed record UpstreamNotFound(string Host);
 
+public sealed record NoHealthyUpstreams(string Host);
+
 public sealed record RoutesUpdated(IReadOnlyList<DomainName> Domains);
 
 public sealed record RouteRemoved(DomainName DomainName);

@@ -168,14 +168,14 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task DomainEntityActor_should_reply_UpstreamNotFound_when_no_upstreams()
+    public async Task DomainEntityActor_should_reply_NoHealthyUpstreams_when_no_upstreams()
     {
         var (entity, _) = CreateEntity();
         var config = CreateDomainConfig("example.com");
 
         await entity.Ask<ConfigurationCommandAck>(new AddDomain(config), Timeout);
 
-        var result = await entity.Ask<UpstreamNotFound>(
+        var result = await entity.Ask<NoHealthyUpstreams>(
             new ResolveUpstream("example.com"), Timeout);
 
         Assert.Equal("example.com", result.Host);
@@ -224,7 +224,7 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
     }
 
     [Fact(Timeout = 5000)]
-    public async Task DomainEntityActor_should_reply_UpstreamNotFound_when_all_unhealthy()
+    public async Task DomainEntityActor_should_reply_NoHealthyUpstreams_when_all_unhealthy()
     {
         var (entity, _) = CreateEntity();
         var config = CreateDomainConfig("example.com");
@@ -236,7 +236,7 @@ public sealed class DomainEntityActorSpec : PersistenceTestKit
 
         entity.Tell(new UpstreamHealthChanged(upstream.Url, IsHealthy: false));
 
-        var result = await entity.Ask<UpstreamNotFound>(
+        var result = await entity.Ask<NoHealthyUpstreams>(
             new ResolveUpstream("example.com"), Timeout);
 
         Assert.Equal("example.com", result.Host);

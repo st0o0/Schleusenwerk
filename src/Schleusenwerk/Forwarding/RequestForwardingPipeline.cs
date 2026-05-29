@@ -92,11 +92,15 @@ internal sealed class RequestForwardingPipeline
         foreach (var header in source.Headers)
         {
             if (IsHopByHopHeader(header.Key))
+            {
                 continue;
+            }
 
             // Content headers go on Content, not on the request itself
             if (IsContentHeader(header.Key))
+            {
                 continue;
+            }
 
             target.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
         }
@@ -142,7 +146,10 @@ internal sealed class RequestForwardingPipeline
         foreach (var header in source.Headers)
         {
             if (IsHopByHopHeader(header.Key))
+            {
                 continue;
+            }
+
             target.Headers.Append(header.Key, header.Value.ToArray());
         }
 
@@ -150,7 +157,10 @@ internal sealed class RequestForwardingPipeline
         foreach (var header in source.Content.Headers)
         {
             if (IsHopByHopHeader(header.Key))
+            {
                 continue;
+            }
+
             target.Headers.Append(header.Key, header.Value.ToArray());
         }
 

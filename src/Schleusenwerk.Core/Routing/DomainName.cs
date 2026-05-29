@@ -18,7 +18,9 @@ public readonly record struct DomainName
     public static DomainName Parse(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
+        {
             throw new FormatException("Domain name cannot be empty.");
+        }
 
         var normalized = input.Trim().ToLowerInvariant();
         var isWildcard = normalized.StartsWith("*.");
@@ -70,7 +72,9 @@ public readonly record struct DomainName
         var normalized = host.Trim().ToLowerInvariant();
 
         if (!IsWildcard)
+        {
             return Value == normalized;
+        }
 
         // *.example.com matches sub.example.com but not example.com
         var suffix = Value[1..]; // .example.com
@@ -82,7 +86,9 @@ public readonly record struct DomainName
         foreach (var c in label)
         {
             if (!char.IsLetterOrDigit(c) && c != '-')
+            {
                 return false;
+            }
         }
 
         return label[0] != '-' && label[^1] != '-';

@@ -44,11 +44,12 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
         {
             app.Use(HttpsRedirectionMiddleware);
         }
+
         app.UseWebSockets();
         app.UseRateLimiter();
 
         app.MapFallback(async (HttpContext ctx, IProxyDispatcher dispatcher, CancellationToken ct) =>
-            await dispatcher.HandleAsync(ctx, ct))
+                await dispatcher.HandleAsync(ctx, ct))
             .RequireRateLimiting(DomainRateLimitPolicy.PolicyName);
     }
 
@@ -62,7 +63,8 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
 
         if (context.Request.Scheme == "http")
         {
-            var httpsUrl = $"https://{context.Request.Host}{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}";
+            var httpsUrl =
+                $"https://{context.Request.Host}{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}";
             context.Response.StatusCode = StatusCodes.Status307TemporaryRedirect;
             context.Response.Headers.Location = httpsUrl;
             return;
@@ -71,4 +73,3 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
         await next(context);
     }
 }
-

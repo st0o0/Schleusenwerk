@@ -38,7 +38,10 @@ public sealed class SignalREventSpec
         var eventReceived = new TaskCompletionSource<JsonElement>();
         hub.On<JsonElement>("OnProxyEvent", evt =>
         {
-            if (evt.GetProperty("type").GetString() == "RouteRemoved") eventReceived.TrySetResult(evt);
+            if (evt.GetProperty("type").GetString() == "RouteRemoved")
+            {
+                eventReceived.TrySetResult(evt);
+            }
         });
         await hub.StartAsync(ct);
         await TestHelper.RemoveRouteAsync(_host.Client, domain, ct);

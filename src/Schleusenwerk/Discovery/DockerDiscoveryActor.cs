@@ -87,7 +87,9 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
     {
         var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
         if (!string.IsNullOrWhiteSpace(dockerHost))
+        {
             return new Uri(dockerHost);
+        }
 
         return RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? ResolveWindowsPipeUri()
@@ -112,7 +114,9 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         foreach (var name in candidates)
         {
             if (pipes.Contains(name))
+            {
                 return new Uri($"npipe://./pipe/{name}");
+            }
         }
 
         return null;
@@ -129,12 +133,16 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         // Rootless Podman uses XDG_RUNTIME_DIR (e.g. /run/user/1000/podman/podman.sock).
         var xdgRuntimeDir = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         if (!string.IsNullOrWhiteSpace(xdgRuntimeDir))
+        {
             candidates.Add(Path.Combine(xdgRuntimeDir, "podman", "podman.sock"));
+        }
 
         foreach (var path in candidates)
         {
             if (File.Exists(path))
+            {
                 return new Uri($"unix://{path}");
+            }
         }
 
         return null;
@@ -205,6 +213,7 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
                 labels,
                 ip);
         }
+
         StartMonitoring();
     }
 
@@ -249,7 +258,8 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         _domainRegion.Tell(new AddDomain(domainConfig));
         _domainRegion.Tell(new AddUpstream(parsed.Domain, parsed.Upstream));
 
-        _log.Info("Registered container {Id} → {Domain} @ {Url}", containerId[..12], parsed.Domain, parsed.Upstream.Url);
+        _log.Info("Registered container {Id} → {Domain} @ {Url}", containerId[..12], parsed.Domain,
+            parsed.Upstream.Url);
     }
 
     private void UnregisterContainer(string containerId)
@@ -299,30 +309,40 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
     private static string? ExtractIp(IDictionary<string, EndpointSettings>? networks)
     {
         if (networks is null)
+        {
             return null;
+        }
 
         foreach (var network in networks.Values)
         {
             if (!string.IsNullOrWhiteSpace(network.IPAddress))
+            {
                 return network.IPAddress;
+            }
         }
 
         return null;
     }
 
-    // --- Internal messages ---
-
     private sealed record Connect(int Attempt);
+
     private sealed record StartDiscovery
     {
         public static StartDiscovery Instance { get; } = new();
     }
+
     private sealed record ContainerEvent(string ContainerId, string Status);
+
     private sealed record ContainerInspected(ContainerInspectResponse Response);
+
     private sealed record InspectFailed(string ContainerId, Exception Error);
+
     private sealed record MonitoringEnded(Exception? Error);
+
     private sealed record ScanResult(IList<ContainerListResponse> Containers);
+
     private sealed record ScanFailed(Exception Error);
+
     private sealed record Noop
     {
         public static Noop Instance { get; } = new();

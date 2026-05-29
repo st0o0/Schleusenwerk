@@ -18,6 +18,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Schleusenwerk.Tests" />
+        <InternalsVisibleTo Include="Schleusenwerk.IntegrationTests" />
     </ItemGroup>
 
 </Project>

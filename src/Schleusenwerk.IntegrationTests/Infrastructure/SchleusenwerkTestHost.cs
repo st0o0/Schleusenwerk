@@ -1,4 +1,8 @@
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,8 +32,10 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
 
         try
         {
-            // Build the WebApplicationBuilder with test configuration
-            var builder = WebApplication.CreateBuilder();
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = "Development",
+            });
 
             // Override configuration with test values
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -41,23 +47,33 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
                 ["Certificates:Path"] = _tempCertsDirectory,
                 ["Lego:WebrootPath"] = _tempWebrootDirectory,
 
-                // Disable Docker discovery
-                ["Docker:SocketPath"] = "",
+                // Disable Docker discovery (avoids Docker.DotNet version conflict with TestContainers)
+                ["Docker:Enabled"] = "false",
 
-                // Local remoting with OS-assigned port
+                // Local remoting on a free port (seed node needs a real port, not 0)
                 ["Akka:Remoting:Hostname"] = "127.0.0.1",
-                ["Akka:Remoting:Port"] = "0",
+                ["Akka:Remoting:Port"] = FindFreePort().ToString(),
 
                 // Listen on random port
                 ["ASPNETCORE_URLS"] = "http://127.0.0.1:0",
 
-                // Allow all CORS origins for testing
-                ["Cors:AllowedOrigins"] = "*",
+                // Allow test origins for CORS (wildcard not allowed with credentials)
+                ["Cors:AllowedOrigins"] = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:0",
+            });
+
+            var kestrelPort = FindFreePort();
+            builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(k =>
+            {
+                k.Listen(IPAddress.Loopback, kestrelPort);
             });
 
             // Call setup classes in order
             var servicesSetup = new SchleusenwerkServicesSetup();
             servicesSetup.SetupServices(builder.Services, builder.Configuration);
+
+            // Controllers live in the Schleusenwerk assembly, not the test assembly
+            builder.Services.AddControllers()
+                .AddApplicationPart(typeof(SchleusenwerkServicesSetup).Assembly);
 
             var actorSystemSetup = new SchleusenwerkActorSystemSetup();
             ((IServiceSetupContainer)actorSystemSetup).SetupServices(builder.Services, builder.Configuration);
@@ -71,7 +87,10 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
 
             await _app.StartAsync();
 
-            var url = _app.Urls.FirstOrDefault()
+            var server = _app.Services.GetRequiredService<IServer>();
+            var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses
+                ?? throw new InvalidOperationException("No server addresses available");
+            var url = addresses.FirstOrDefault()
                 ?? throw new InvalidOperationException("Kestrel did not bind to any URL");
 
             BaseUri = new Uri(url);
@@ -137,6 +156,15 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
         {
             // Suppress cleanup errors
         }
+    }
+
+    private static int FindFreePort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 
     private async Task WaitForReady(CancellationToken ct)

@@ -298,7 +298,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
 
         if (available.Count == 0)
         {
-            Sender.Tell(new UpstreamNotFound(msg.Host));
+            Sender.Tell(new NoHealthyUpstreams(msg.Host));
             return;
         }
 

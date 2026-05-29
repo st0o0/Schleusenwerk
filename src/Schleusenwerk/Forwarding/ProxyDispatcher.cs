@@ -54,6 +54,10 @@ internal sealed class ProxyDispatcher : IProxyDispatcher
                 await HandleResolvedRoute(context, host, resolved.Target, resolved.Config, ct);
                 break;
 
+            case NoHealthyUpstreams:
+                context.Response.StatusCode = StatusCodes.Status502BadGateway;
+                break;
+
             case UpstreamNotFound:
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 break;

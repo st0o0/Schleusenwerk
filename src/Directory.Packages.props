@@ -14,9 +14,6 @@
         <PackageVersion Include="Servus.Akka" Version="0.3.10"/>
         <PackageVersion Include="Servus.Core" Version="0.33.2"/>
     </ItemGroup>
-    <ItemGroup Label="HTTP">
-        <PackageVersion Include="TurboHTTP" Version="0.1.0"/>
-    </ItemGroup>
     <ItemGroup Label="SQLite">
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.14"/>
     </ItemGroup>

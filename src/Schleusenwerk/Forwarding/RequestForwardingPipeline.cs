@@ -2,28 +2,23 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
 using Schleusenwerk.Routing;
-using TurboHTTP;
 
 namespace Schleusenwerk.Forwarding;
 
-/// <summary>
-/// Converts incoming Kestrel requests to upstream HTTP requests via TurboHTTP,
-/// streams responses back, and handles proxy headers and error conditions.
-/// </summary>
 internal sealed class RequestForwardingPipeline
 {
-    private readonly ITurboHttpClient _sharedClient;
+    private readonly HttpClient _sharedClient;
 
-    public RequestForwardingPipeline(ITurboHttpClientFactory clientFactory)
+    public RequestForwardingPipeline(IHttpClientFactory clientFactory)
     {
-        _sharedClient = clientFactory.CreateClient(string.Empty);
+        _sharedClient = clientFactory.CreateClient("upstream");
     }
 
     public async Task ForwardAsync(HttpContext context, UpstreamTarget upstream, DomainConfig config, HeaderManipulationFilter? headerFilter = null)
     {
-        var cancellationToken = context.RequestAborted;
-
-        _sharedClient.Timeout = config.RequestTimeout;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        timeoutCts.CancelAfter(config.RequestTimeout);
+        var cancellationToken = timeoutCts.Token;
 
         var upstreamUri = BuildUpstreamUri(context.Request, upstream.Url);
         using var requestMessage = CreateRequestMessage(context.Request, upstreamUri);
@@ -48,14 +43,9 @@ internal sealed class RequestForwardingPipeline
         HttpResponseMessage upstreamResponse;
         try
         {
-            upstreamResponse = await _sharedClient.SendAsync(requestMessage, cancellationToken);
+            upstreamResponse = await _sharedClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            context.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
-            return;
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
         {
             context.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
             return;
@@ -66,11 +56,6 @@ internal sealed class RequestForwardingPipeline
             return;
         }
         catch (SocketException)
-        {
-            context.Response.StatusCode = StatusCodes.Status502BadGateway;
-            return;
-        }
-        catch (TurboHttpException)
         {
             context.Response.StatusCode = StatusCodes.Status502BadGateway;
             return;

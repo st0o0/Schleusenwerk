@@ -8,8 +8,6 @@ using Schleusenwerk.Persistence;
 using Schleusenwerk.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Servus.Core.Application.Startup;
-using TurboHTTP;
-
 namespace Schleusenwerk.Startup;
 
 public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
@@ -17,7 +15,12 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
     public void SetupServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpClient();
-        services.AddTurboHttpClient();
+        services.AddHttpClient("upstream")
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                EnableMultipleHttp2Connections = true,
+            });
         services.AddSingleton<ProxyMetrics>();
         services.AddSingleton<RequestForwardingPipeline>();
         services.AddSingleton<HeaderManipulationFilter>();

@@ -7,4 +7,5 @@ public sealed class IntegrationCollection :
     ICollectionFixture<SchleusenwerkTestHost>,
     ICollectionFixture<EchoServerFixture>,
     ICollectionFixture<NginxFixture>,
-    ICollectionFixture<WebSocketEchoFixture>;
+    ICollectionFixture<WebSocketEchoFixture>,
+    ICollectionFixture<ToxiproxyFixture>;

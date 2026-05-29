@@ -1,7 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
-using Toxiproxy.Net;
 using Xunit;
 
 namespace Schleusenwerk.IntegrationTests.Infrastructure;
@@ -19,13 +18,15 @@ public sealed class ToxiproxyFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        _network = new NetworkBuilder().WithName($"toxiproxy-{Guid.NewGuid():N}").Build();
-        await _network.CreateAsync();
+        _network = new NetworkBuilder()
+            .WithName($"toxiproxy-{Guid.NewGuid():N}")
+            .Build();
 
         _echoBackend = new ContainerBuilder()
             .WithImage("ealen/echo-server:latest")
             .WithNetwork(_network)
             .WithNetworkAliases("echo-backend")
+            .WithPortBinding(80, true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(80)))
             .Build();
 
@@ -34,41 +35,28 @@ public sealed class ToxiproxyFixture : IAsyncLifetime
             .WithNetwork(_network)
             .WithPortBinding(8474, true)
             .WithPortBinding(18080, true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(8474)))
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(8474).ForPath("/version")))
             .Build();
 
-        await Task.WhenAll(_echoBackend.StartAsync(), _toxiproxy.StartAsync());
+        // Start sequentially — network must exist before containers join it
+        await _echoBackend.StartAsync();
+        await _toxiproxy.StartAsync();
 
         ApiPort = _toxiproxy.GetMappedPublicPort(8474);
-        ApiHost = "localhost";
+        ApiHost = _toxiproxy.Hostname;
         ProxyPort = _toxiproxy.GetMappedPublicPort(18080);
-        ProxyUrl = $"http://localhost:{ProxyPort}";
+        ProxyUrl = $"http://{_toxiproxy.Hostname}:{ProxyPort}";
 
-        // Create the proxy that forwards to echo-backend
-        var connection = new Connection(ApiHost, ApiPort);
-        var client = connection.Client();
-        client.Add(new Proxy
-        {
-            Name = "echo",
-            Listen = "0.0.0.0:18080",
-            Upstream = "echo-backend:80",
-            Enabled = true,
-        });
+        using var client = CreateClient();
+        await client.CreateProxyAsync("echo", "0.0.0.0:18080", "echo-backend:80");
     }
 
-    public Connection CreateConnection() => new(ApiHost, ApiPort);
+    public ToxiproxyClient CreateClient() => new(ApiHost, ApiPort);
 
-    public void Reset()
+    public async Task ResetAsync(CancellationToken ct = default)
     {
-        var client = new Connection(ApiHost, ApiPort).Client();
-        var proxy = client.FindProxy("echo");
-        proxy.Enabled = true;
-        proxy.Update();
-        var toxics = proxy.GetAllToxics();
-        foreach (var toxic in toxics)
-        {
-            proxy.RemoveToxic(toxic.Name);
-        }
+        using var client = CreateClient();
+        await client.ResetAsync("echo", ct);
     }
 
     public async ValueTask DisposeAsync()

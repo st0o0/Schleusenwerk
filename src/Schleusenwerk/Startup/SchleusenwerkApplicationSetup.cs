@@ -7,7 +7,9 @@ namespace Schleusenwerk.Startup;
 
 public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<WebApplication>
 {
-    protected override void SetupApplication(WebApplication app)
+    protected override void SetupApplication(WebApplication app) => SetupApplicationInternal(app);
+
+    internal void SetupApplicationInternal(WebApplication app)
     {
         app.MapGet("/health", async (IConfigurationStore store, CancellationToken ct) =>
         {

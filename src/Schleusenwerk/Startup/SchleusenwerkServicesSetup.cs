@@ -21,6 +21,8 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 EnableMultipleHttp2Connections = true,
             });
+        services.AddSingleton<ConnectionTracker>();
+        services.AddHostedService<GracefulShutdownService>();
         services.AddSingleton<ProxyMetrics>();
         services.AddSingleton<RequestForwardingPipeline>();
         services.AddSingleton<HeaderManipulationFilter>();

@@ -49,8 +49,6 @@ public sealed class DomainEntityActorCircuitBreakerSpec : PersistenceTestKit
         entity.Tell(new RequestFailed(upstream1.Url) { Domain = "example.com" });
         entity.Tell(new RequestFailed(upstream1.Url) { Domain = "example.com" });
 
-        await Task.Delay(100);
-
         // Should only resolve to upstream2
         for (var i = 0; i < 4; i++)
         {
@@ -78,11 +76,9 @@ public sealed class DomainEntityActorCircuitBreakerSpec : PersistenceTestKit
         entity.Tell(new RequestFailed(upstream1.Url) { Domain = "example.com" });
         entity.Tell(new RequestFailed(upstream1.Url) { Domain = "example.com" });
         entity.Tell(new RequestFailed(upstream1.Url) { Domain = "example.com" });
-        await Task.Delay(100);
 
         // Health check says it's back
         entity.Tell(new UpstreamHealthChanged(upstream1.Url, IsHealthy: true));
-        await Task.Delay(100);
 
         // Should resolve to both now
         var hosts = new List<string>();

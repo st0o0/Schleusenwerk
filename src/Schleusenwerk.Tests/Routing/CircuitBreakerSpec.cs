@@ -38,46 +38,48 @@ public sealed class CircuitBreakerSpec
     }
 
     [Fact(Timeout = 5000)]
-    public async Task CircuitBreaker_should_transition_to_half_open_after_cooldown()
+    public void CircuitBreaker_should_transition_to_half_open_after_cooldown()
     {
-        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
+        var time = new FakeTimeProvider();
+        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50), time);
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
         Assert.Equal(CircuitStatus.Open, state.Status);
-        await Task.Delay(100);
+        time.Advance(TimeSpan.FromMilliseconds(100));
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         Assert.True(state.IsAvailable);
     }
 
     [Fact(Timeout = 5000)]
-    public async Task CircuitBreaker_should_close_on_success_when_half_open()
+    public void CircuitBreaker_should_close_on_success_when_half_open()
     {
-        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
+        var time = new FakeTimeProvider();
+        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50), time);
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
-        await Task.Delay(100);
+        time.Advance(TimeSpan.FromMilliseconds(100));
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         state.RecordSuccess();
         Assert.Equal(CircuitStatus.Closed, state.Status);
     }
 
     [Fact(Timeout = 5000)]
-    public async Task CircuitBreaker_should_reopen_with_doubled_cooldown_on_failure_when_half_open()
+    public void CircuitBreaker_should_reopen_with_doubled_cooldown_on_failure_when_half_open()
     {
-        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
+        var time = new FakeTimeProvider();
+        var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50), time);
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
-        await Task.Delay(100);
+        time.Advance(TimeSpan.FromMilliseconds(100));
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         state.RecordFailure();
         Assert.Equal(CircuitStatus.Open, state.Status);
-        // Should NOT be half-open after 50ms anymore (doubled to 100ms)
-        await Task.Delay(60);
+        time.Advance(TimeSpan.FromMilliseconds(60));
         Assert.Equal(CircuitStatus.Open, state.Status);
-        await Task.Delay(60);
+        time.Advance(TimeSpan.FromMilliseconds(60));
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
     }
 

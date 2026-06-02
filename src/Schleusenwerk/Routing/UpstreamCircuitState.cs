@@ -14,15 +14,17 @@ public sealed class UpstreamCircuitState
 
     private readonly UpstreamUrl _url;
     private readonly TimeSpan _baseCooldown;
+    private readonly TimeProvider _timeProvider;
     private CircuitStatus _status = CircuitStatus.Closed;
-    private DateTime _openedAt;
+    private long _openedAtTimestamp;
     private TimeSpan _currentCooldown;
 
-    public UpstreamCircuitState(UpstreamUrl url, TimeSpan baseCooldown)
+    public UpstreamCircuitState(UpstreamUrl url, TimeSpan baseCooldown, TimeProvider? timeProvider = null)
     {
         _url = url;
         _baseCooldown = baseCooldown;
         _currentCooldown = baseCooldown;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public int ConsecutiveFailures { get; private set; }
@@ -31,7 +33,7 @@ public sealed class UpstreamCircuitState
     {
         get
         {
-            if (_status == CircuitStatus.Open && DateTime.UtcNow - _openedAt >= _currentCooldown)
+            if (_status == CircuitStatus.Open && _timeProvider.GetElapsedTime(_openedAtTimestamp) >= _currentCooldown)
             {
                 _status = CircuitStatus.HalfOpen;
             }
@@ -81,6 +83,6 @@ public sealed class UpstreamCircuitState
     private void TransitionToOpen()
     {
         _status = CircuitStatus.Open;
-        _openedAt = DateTime.UtcNow;
+        _openedAtTimestamp = _timeProvider.GetTimestamp();
     }
 }

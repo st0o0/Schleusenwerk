@@ -129,7 +129,7 @@ internal sealed class RequestForwardingPipeline
         requestMessage.Headers.TryAddWithoutValidation(HeaderNames.XForwardedHost, host);
     }
 
-    private static void RemoveHopByHopHeaders(System.Net.Http.Headers.HttpRequestHeaders headers)
+    private static void RemoveHopByHopHeaders(HttpRequestHeaders headers)
     {
         foreach (var name in HopByHopHeaders)
         {

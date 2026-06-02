@@ -21,6 +21,7 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
                 EnableMultipleHttp2Connections = true,
             });
         services.AddSingleton<ConnectionTracker>();
+        services.AddSingleton<AccessLogMiddleware>();
         services.AddHostedService<GracefulShutdownService>();
         services.AddSingleton<ProxyMetrics>();
         services.AddSingleton<RequestForwardingPipeline>();

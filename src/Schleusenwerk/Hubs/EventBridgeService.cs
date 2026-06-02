@@ -17,12 +17,12 @@ internal sealed class EventBridgeService : BackgroundService
 
     public EventBridgeService(
         IReadOnlyActorRegistry registry,
-        IMaterializer materializer,
+        ActorSystem system,
         IHubContext<ProxyEventHub> hub,
         ILogger<EventBridgeService> logger)
     {
         _registry = registry;
-        _materializer = materializer;
+        _materializer = system.Materializer();
         _hub = hub;
         _logger = logger;
     }
@@ -57,14 +57,14 @@ internal sealed class EventBridgeService : BackgroundService
 
         await subscribed.SourceRef.Source
             .Where(DomainModelMapper.CanMapToProxyEvent)
-            .RunWith(Sink.ForEachAsync(1, async evt =>
+            .Select(DomainModelMapper.ToProxyEvent)
+            .RunWith(Sink.ForEachAsync<ProxyEventDto>(1, async dto =>
             {
                 if (ct.IsCancellationRequested)
                 {
                     return;
                 }
 
-                var dto = DomainModelMapper.ToProxyEvent(evt);
                 await _hub.Clients.All.SendAsync("OnProxyEvent", dto, ct);
             }), _materializer)
             .ConfigureAwait(false);

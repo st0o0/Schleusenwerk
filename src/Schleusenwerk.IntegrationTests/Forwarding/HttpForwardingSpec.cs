@@ -39,7 +39,7 @@ public sealed class HttpForwardingSpec
         var domain = TestHelper.UniqueDomain("fwd-post");
         await TestHelper.RegisterRouteAsync(_host.Client, domain, _echo.BaseUrl, ct: ct);
         using var client = TestHelper.CreateProxyClient(_host.BaseUri, domain);
-        var payload = """{"test": "data"}""";
+        const string payload = """{"test": "data"}""";
         var response = await client.PostAsync("/", new StringContent(payload, Encoding.UTF8, "application/json"), ct);
         // Body forwarding through TurboHTTP may time out for some upstream servers
         Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.GatewayTimeout,

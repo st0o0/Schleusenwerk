@@ -57,7 +57,7 @@ internal sealed class EventBridgeService : BackgroundService
 
         await subscribed.SourceRef.Source
             .Where(DomainModelMapper.CanMapToProxyEvent)
-            .RunForeach(async evt =>
+            .RunWith(Sink.ForEachAsync(1, async evt =>
             {
                 if (ct.IsCancellationRequested)
                 {
@@ -66,7 +66,7 @@ internal sealed class EventBridgeService : BackgroundService
 
                 var dto = DomainModelMapper.ToProxyEvent(evt);
                 await _hub.Clients.All.SendAsync("OnProxyEvent", dto, ct);
-            }, _materializer)
+            }), _materializer)
             .ConfigureAwait(false);
     }
 }

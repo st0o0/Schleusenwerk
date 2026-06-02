@@ -7,6 +7,7 @@ using Schleusenwerk.Persistence;
 using Schleusenwerk.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Servus.Core.Application.Startup;
+
 namespace Schleusenwerk.Startup;
 
 public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
@@ -30,7 +31,7 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         services.AddSingleton<IProxyDispatcher, ProxyDispatcher>();
 
         var connectionString = configuration["Akka:Persistence:ConnectionString"]
-            ?? "Data Source=/data/schleusenwerk.db";
+                               ?? "Data Source=/data/schleusenwerk.db";
         services.AddSingleton<IConfigurationStore>(new SqliteConfigurationStore(connectionString));
         services.AddSingleton<IConfigurationService, ConfigurationService>();
 
@@ -55,25 +56,17 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
             var maxBodyMb = int.TryParse(configuration["Kestrel:MaxRequestBodySizeMB"], out var mb) ? mb : 100;
             options.Limits.MaxRequestBodySize = maxBodyMb * 1024L * 1024L;
 
-            if (int.TryParse(configuration["Kestrel:MaxConcurrentConnections"], out var maxConn))
-            {
-                options.Limits.MaxConcurrentConnections = maxConn;
-            }
-            else
-            {
-                options.Limits.MaxConcurrentConnections = 10_000;
-            }
+            options.Limits.MaxConcurrentConnections =
+                int.TryParse(configuration["Kestrel:MaxConcurrentConnections"], out var maxConn) ? maxConn : 10_000;
 
-            if (int.TryParse(configuration["Kestrel:MaxConcurrentUpgradedConnections"], out var maxUpgraded))
-            {
-                options.Limits.MaxConcurrentUpgradedConnections = maxUpgraded;
-            }
-            else
-            {
-                options.Limits.MaxConcurrentUpgradedConnections = 1_000;
-            }
+            options.Limits.MaxConcurrentUpgradedConnections =
+                int.TryParse(configuration["Kestrel:MaxConcurrentUpgradedConnections"], out var maxUpgraded)
+                    ? maxUpgraded
+                    : 1_000;
 
-            var headerTimeoutSec = int.TryParse(configuration["Kestrel:RequestHeadersTimeoutSeconds"], out var ht) ? ht : 30;
+            var headerTimeoutSec = int.TryParse(configuration["Kestrel:RequestHeadersTimeoutSeconds"], out var ht)
+                ? ht
+                : 30;
             options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(headerTimeoutSec);
             options.Limits.MaxRequestHeaderCount = 100;
             options.Limits.MaxRequestHeadersTotalSize = 64 * 1024;
@@ -96,8 +89,10 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         {
             options.AddDefaultPolicy(policy =>
             {
-                var allowedOrigins = configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:3000";
-                policy.WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                var allowedOrigins = configuration["Cors:AllowedOrigins"] ??
+                                     "http://localhost:5173,http://localhost:3000";
+                policy.WithOrigins(allowedOrigins.Split(',',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();

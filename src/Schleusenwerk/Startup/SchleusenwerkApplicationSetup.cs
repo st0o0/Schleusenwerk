@@ -34,12 +34,7 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
         {
             var webrootPath = config["Lego:WebrootPath"] ?? "/tmp/acme-webroot";
             var filePath = Path.Combine(webrootPath, ".well-known", "acme-challenge", token);
-            if (!File.Exists(filePath))
-            {
-                return Results.NotFound();
-            }
-
-            return Results.Text(File.ReadAllText(filePath));
+            return !File.Exists(filePath) ? Results.NotFound() : Results.Text(File.ReadAllText(filePath));
         });
 
         app.UseCors();

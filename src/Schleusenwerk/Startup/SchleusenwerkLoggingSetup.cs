@@ -6,9 +6,9 @@ namespace Schleusenwerk.Startup;
 
 public sealed class SchleusenwerkLoggingSetup : IHostBuilderSetupContainer
 {
-    public void ConfigureHostBuilder(IHostBuilder hostBuilder)
+    public void ConfigureHostBuilder(IHostBuilder builder)
     {
-        hostBuilder.UseSerilog((context, configuration) =>
+        builder.UseSerilog((context, configuration) =>
         {
             configuration.ReadFrom.Configuration(context.Configuration);
 

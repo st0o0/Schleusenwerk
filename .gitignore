@@ -45,6 +45,13 @@ TestResult.xml
 [Tt]humbs.db
 *.DS_Store
 
+## Node / Vue
+node_modules/
+dist/
+*.tsbuildinfo
+src/Schleusenwerk.Web/src/**/*.js
+src/Schleusenwerk.Web/src/**/*.js.map
+
 ## Docker
 **/docker-compose*.override.yml
 .maggus/runs
@@ -60,3 +67,5 @@ TestResult.xml
 COMMIT.md
 .worktrees/
 docs/superpowers/
+
+docs/specs/

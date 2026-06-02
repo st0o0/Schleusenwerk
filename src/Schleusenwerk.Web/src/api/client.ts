@@ -22,6 +22,7 @@ export interface CertificateDetail { domain: string; thumbprint: string; notBefo
 export interface ProxyHealthResponse { routeCount: number; healthyCount: number; unhealthyCount: number }
 export interface UpstreamHealthResponse { domain: string; upstreams: UpstreamHealthEntry[] }
 export interface ProxyEventDto { type: string; domain: string; message: string; isHealthy: boolean; upstreamUrl: string }
+export interface DiscoveryStatus { enabled: boolean; containers: DiscoveredContainer[] }
 export interface DiscoveredContainer { name: string; image: string; status: string; labels: Record<string, string>; assignedDomain: string | null; conflictReason: string | null }
 export interface ProxySettings { stage: string; acmeEmail: string; dnsProvider: string; defaultRequestTimeoutSeconds: number; maxConnectionsPerUpstream: number; forceHttpsGlobally: boolean }
 
@@ -65,7 +66,7 @@ export const api = {
     getDomain: (domain: string) => request<UpstreamHealthResponse>(`/health/${encodeURIComponent(domain)}`),
   },
   discovery: {
-    listContainers: () => request<DiscoveredContainer[]>('/discovery/containers'),
+    listContainers: () => request<DiscoveryStatus>('/discovery/containers'),
   },
   settings: {
     get: () => request<ProxySettings>('/settings'),

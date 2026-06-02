@@ -23,6 +23,8 @@ export default {
         valid: 'Gültiges Siegel',
         expiring: 'Siegel läuft bald ab',
         selfSigned: 'Selbstsigniert',
+        missing: 'Kein Siegel bereitgestellt',
+        error: 'Siegelbereitstellung fehlgeschlagen',
         unknown: 'Unbekannt',
     },
     common: {
@@ -96,6 +98,7 @@ export default {
         subtitle: 'Docker-Erkennung',
         connected: 'Socket verbunden',
         disconnected: 'Nicht verbunden',
+        disabled: 'Docker deaktiviert',
         image: 'Image:',
         labels: 'Labels:',
         noLabels: 'Keine Schleusenwerk-Labels erkannt',

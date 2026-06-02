@@ -1,5 +1,6 @@
 using Akka.Actor;
 using Akka.Hosting;
+using Schleusenwerk.Certificates;
 using Schleusenwerk.Routing;
 
 namespace Schleusenwerk.Persistence;
@@ -8,12 +9,18 @@ public sealed class ConfigurationService : IConfigurationService
 {
     private readonly IActorRef _domainRegion;
     private readonly IConfigurationStore _store;
+    private readonly ICertificateStore _certStore;
     private readonly TimeSpan _timeout;
 
-    public ConfigurationService(IReadOnlyActorRegistry registry, IConfigurationStore store, TimeSpan? timeout = null)
+    public ConfigurationService(
+        IReadOnlyActorRegistry registry,
+        IConfigurationStore store,
+        ICertificateStore certStore,
+        TimeSpan? timeout = null)
     {
         _domainRegion = registry.Get<DomainEntityActor>();
         _store = store;
+        _certStore = certStore;
         _timeout = timeout ?? TimeSpan.FromSeconds(5);
     }
 
@@ -22,11 +29,40 @@ public sealed class ConfigurationService : IConfigurationService
         var domains = await _store.GetAllDomainsAsync(cancellationToken);
         var settings = await _store.GetSettingsAsync(cancellationToken);
 
+        var domainList = domains.ToList();
+        var upstreams = new Dictionary<string, IReadOnlyList<UpstreamTarget>>();
+        var certificates = new Dictionary<string, CertificateInfo>();
+
+        foreach (var domain in domainList)
+        {
+            var key = domain.DomainName.Value;
+
+            var result = await _domainRegion.Ask<object>(
+                new GetDomainConfig { Domain = key }, _timeout, cancellationToken);
+
+            upstreams[key] = result is DomainConfigResult configResult
+                ? configResult.Upstreams
+                : [];
+
+            var cert = _certStore.GetCertificate(domain.DomainName);
+            if (cert is not null)
+            {
+                certificates[key] = new CertificateInfo
+                {
+                    Thumbprint = cert.Thumbprint,
+                    NotBefore = cert.NotBefore,
+                    NotAfter = cert.NotAfter,
+                    Issuer = cert.Issuer,
+                    IsSelfSigned = cert.Issuer == cert.Subject,
+                };
+            }
+        }
+
         var snapshot = new ConfigurationSnapshot
         {
-            Domains = domains.ToList(),
-            Upstreams = new Dictionary<string, IReadOnlyList<UpstreamTarget>>(),
-            Certificates = new Dictionary<string, CertificateInfo>(),
+            Domains = domainList,
+            Upstreams = upstreams,
+            Certificates = certificates,
             Settings = settings,
         };
 

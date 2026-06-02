@@ -76,6 +76,10 @@ public sealed record ProxyEventDto(
     bool IsHealthy,
     string UpstreamUrl);
 
+public sealed record DiscoveryStatusDto(
+    bool Enabled,
+    IReadOnlyList<DiscoveredContainerDto> Containers);
+
 public sealed record DiscoveredContainerDto(
     string Name,
     string Image,

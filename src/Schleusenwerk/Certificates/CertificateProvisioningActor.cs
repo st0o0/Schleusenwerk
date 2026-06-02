@@ -121,6 +121,7 @@ public sealed class CertificateProvisioningActor : ReceiveActor, IWithTimers
         else
         {
             _log.Warning("Certificate provisioning failed for {Domain}: {Error}", msg.Domain, msg.Error);
+            _eventHub.Tell(new CertificateProvisioningFailed(msg.Domain, msg.Error!));
 
             var delay = TimeSpan.FromMinutes(Math.Min(Math.Pow(2, msg.Attempt), MaxRetryDelay.TotalMinutes));
             _log.Info("Retrying provisioning for {Domain} in {Delay}", msg.Domain, delay);

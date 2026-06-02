@@ -37,7 +37,8 @@ import { useCertificatesStore } from '@/stores/certificates'
 const { t } = useI18n()
 const routes = useRoutesStore()
 const certs = useCertificatesStore()
-const certStatus = ref<Record<string, 'valid' | 'expiring' | 'self-signed'>>({})
+type CertStatus = 'valid' | 'expiring' | 'self-signed' | 'missing' | 'error'
+const certStatus = ref<Record<string, CertStatus>>({})
 
 onMounted(async () => {
   await Promise.all([routes.fetchList(), certs.fetchList()])
@@ -50,6 +51,6 @@ onMounted(async () => {
   }
 })
 
-function getCertStatus(domain: string): 'valid' | 'expiring' | 'self-signed' { return certStatus.value[domain] ?? 'valid' }
+function getCertStatus(domain: string): CertStatus { return certStatus.value[domain] ?? 'missing' }
 async function handleDelete(domain: string) { await routes.deleteRoute(domain) }
 </script>

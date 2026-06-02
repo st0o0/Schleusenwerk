@@ -1,6 +1,7 @@
 using Akka.Actor;
 using Akka.Hosting;
 using Akka.Persistence.TestKit;
+using Schleusenwerk.Certificates;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Metrics;
 using Schleusenwerk.Persistence;
@@ -33,7 +34,7 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             $"domain-ws-{id}");
         registry.Register<DomainEntityActor>(domainActor, overwrite: true);
 
-        return new ConfigurationService(registry, store, Timeout);
+        return new ConfigurationService(registry, store, NullCertificateStore.Instance, Timeout);
     }
 
     [Fact(Timeout = 5000)]

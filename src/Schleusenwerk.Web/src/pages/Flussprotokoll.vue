@@ -40,7 +40,8 @@ function getTypeColor(type: string): string {
   switch (type) {
     case 'RouteUpdated': return 'var(--bp-primary)'; case 'RouteRemoved': return 'var(--bp-error)';
     case 'UpstreamHealthChanged': return 'var(--bp-warning)'; case 'CertificateProvisioned': return 'var(--bp-primary)';
-    case 'CertificateExpiring': return 'var(--bp-warning)'; default: return 'var(--bp-text-secondary)'
+    case 'CertificateExpiring': return 'var(--bp-warning)'; case 'CertificateError': return 'var(--bp-error)';
+    default: return 'var(--bp-text-secondary)'
   }
 }
 </script>

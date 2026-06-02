@@ -5,9 +5,9 @@
       <span class="separator">——</span>
       <span class="subtitle">{{ t('discovery.subtitle') }}</span>
       <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
-        <div :class="discovery.connected ? 'bp-live-dot' : 'bp-status-dot gesperrt'" style="width: 7px; height: 7px;"></div>
+        <div :class="statusDotClass" style="width: 7px; height: 7px;"></div>
         <span style="color: var(--bp-text-secondary); font-family: var(--bp-font-mono); font-size: 11px;">
-          {{ discovery.connected ? t('discovery.connected') : t('discovery.disconnected') }}
+          {{ statusLabel }}
         </span>
       </div>
     </div>
@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusIndicator from '@/components/StatusIndicator.vue'
 import { useDiscoveryStore } from '@/stores/discovery'
@@ -67,6 +67,18 @@ import type { DiscoveredContainer } from '@/api/client'
 const { t } = useI18n()
 const discovery = useDiscoveryStore()
 onMounted(() => discovery.fetchContainers())
+
+const statusDotClass = computed(() => {
+  if (!discovery.connected) { return 'bp-status-dot gesperrt' }
+  if (!discovery.enabled) { return 'bp-status-dot neutral' }
+  return 'bp-live-dot'
+})
+
+const statusLabel = computed(() => {
+  if (!discovery.connected) { return t('discovery.disconnected') }
+  if (!discovery.enabled) { return t('discovery.disabled') }
+  return t('discovery.connected')
+})
 
 function hasLabels(c: DiscoveredContainer): boolean {
   return Object.keys(c.labels).some(k => k.startsWith('schleusenwerk.'))

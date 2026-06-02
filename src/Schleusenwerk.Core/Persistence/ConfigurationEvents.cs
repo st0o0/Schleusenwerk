@@ -44,6 +44,11 @@ public sealed record CertificateProvisioningRequested(DomainName DomainName) : I
 public sealed record CertificateExpiring(DomainName DomainName) : ICertificateEvent;
 
 /// <summary>
+/// Published when certificate provisioning fails (e.g. ACME error for .localhost domains).
+/// </summary>
+public sealed record CertificateProvisioningFailed(DomainName DomainName, string Error) : ICertificateEvent;
+
+/// <summary>
 /// Persisted by ConfigurationPersistenceActor when a domain is registered in the index.
 /// </summary>
 public sealed record DomainRegistered(DomainName DomainName);

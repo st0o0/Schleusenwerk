@@ -20,11 +20,11 @@ public sealed class DiscoveryController : ControllerBase
     }
 
     [HttpGet("containers")]
-    public async Task<ActionResult<IReadOnlyList<DiscoveredContainerDto>>> ListContainers(CancellationToken ct)
+    public async Task<ActionResult<DiscoveryStatusDto>> ListContainers(CancellationToken ct)
     {
         if (_discoveryActor is null)
         {
-            return Ok(Array.Empty<DiscoveredContainerDto>());
+            return Ok(new DiscoveryStatusDto(Enabled: false, Containers: []));
         }
 
         var result = await _discoveryActor.Ask<DiscoveredContainersResult>(
@@ -38,6 +38,6 @@ public sealed class DiscoveryController : ControllerBase
             AssignedDomain: c.AssignedDomain?.Value,
             ConflictReason: null)).ToList();
 
-        return Ok(dtos);
+        return Ok(new DiscoveryStatusDto(Enabled: true, Containers: dtos));
     }
 }

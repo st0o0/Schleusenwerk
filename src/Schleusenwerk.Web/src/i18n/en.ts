@@ -23,6 +23,8 @@ export default {
         valid: 'Valid certificate',
         expiring: 'Certificate expiring soon',
         selfSigned: 'Self-signed',
+        missing: 'No certificate provisioned',
+        error: 'Certificate provisioning failed',
         unknown: 'Unknown',
     },
     common: {
@@ -96,6 +98,7 @@ export default {
         subtitle: 'Docker Discovery',
         connected: 'Socket connected',
         disconnected: 'Not connected',
+        disabled: 'Docker disabled',
         image: 'Image:',
         labels: 'Labels:',
         noLabels: 'No Schleusenwerk labels detected',

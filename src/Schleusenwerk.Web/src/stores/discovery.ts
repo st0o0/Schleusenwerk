@@ -6,13 +6,16 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   const containers = ref<DiscoveredContainer[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const connected = ref(true)
+  const enabled = ref(false)
+  const connected = ref(false)
 
   async function fetchContainers() {
     loading.value = true
     error.value = null
     try {
-      containers.value = await api.discovery.listContainers()
+      const result = await api.discovery.listContainers()
+      enabled.value = result.enabled
+      containers.value = result.containers
       connected.value = true
     } catch (e: any) {
       error.value = e.message
@@ -22,5 +25,5 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     }
   }
 
-  return { containers, loading, error, connected, fetchContainers }
+  return { containers, loading, error, enabled, connected, fetchContainers }
 })

@@ -52,7 +52,8 @@ internal static class DomainModelMapper
 
     public static bool CanMapToProxyEvent(IClusterEvent evt)
         => evt is DomainConfigured or DomainDeactivated or UpstreamHealthChanged
-           or CertificateProvisioningRequested or CertificateExpiring;
+           or CertificateProvisioningRequested or CertificateExpiring
+           or CertificateProvisioningFailed;
 
     public static ProxyEventDto ToProxyEvent(IClusterEvent evt) => evt switch
     {
@@ -61,6 +62,7 @@ internal static class DomainModelMapper
         UpstreamHealthChanged e => new ProxyEventDto("UpstreamHealthChanged", "", "", e.IsHealthy, e.Url.Value.ToString()),
         CertificateProvisioningRequested e => new ProxyEventDto("CertificateProvisioned", e.DomainName.Value, "", true, ""),
         CertificateExpiring e => new ProxyEventDto("CertificateExpiring", e.DomainName.Value, "", false, ""),
+        CertificateProvisioningFailed e => new ProxyEventDto("CertificateError", e.DomainName.Value, e.Error, false, ""),
         _ => throw new ArgumentOutOfRangeException(nameof(evt), evt.GetType().Name, "Unmappable event")
     };
 }

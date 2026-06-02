@@ -22,7 +22,7 @@ public static class SelfSignedCertificateGenerator
 
         request.CertificateExtensions.Add(
             new X509EnhancedKeyUsageExtension(
-                new OidCollection { new("1.3.6.1.5.5.7.3.1") },
+                new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") },
                 false));
 
         var sanBuilder = new SubjectAlternativeNameBuilder();

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/st0o0/Schleusenwerk/compare/v0.3.0...v0.4.0) (2026-06-02)
+
+
+### Features
+
+* **AppHost:** add Aspire AppHost configuration ([aa49eb1](https://github.com/st0o0/Schleusenwerk/commit/aa49eb11d519e24234dfcfaf10209000d18b431a))
+* **AppHost:** add OpenTelemetry instrumentation ([1451085](https://github.com/st0o0/Schleusenwerk/commit/145108527c7d3c0aa9ed3e108222ce16530f37ad))
+* **ci:** consolidate and optimize workflows ([e530a33](https://github.com/st0o0/Schleusenwerk/commit/e530a3370585acdd6544267f96b5ea157b573231))
+* **Startup:** add DOMAINS env var integration tests ([4afeefa](https://github.com/st0o0/Schleusenwerk/commit/4afeefa855e7b851a79bd278355b118a64a3f289))
+
+
+### Bug Fixes
+
+* **AppHost:** use RunAsync and clean up config ([9dabe94](https://github.com/st0o0/Schleusenwerk/commit/9dabe947c8cb2dfa239e84ae0ae9078ea3afcc97))
+
 ## [0.3.0](https://github.com/st0o0/Schleusenwerk/compare/v0.2.1...v0.3.0) (2026-06-02)
 
 

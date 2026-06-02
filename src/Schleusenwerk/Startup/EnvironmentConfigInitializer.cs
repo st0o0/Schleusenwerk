@@ -5,20 +5,29 @@ namespace Schleusenwerk.Startup;
 internal sealed class EnvironmentConfigInitializer : IHostedService
 {
     private readonly IConfigurationStore _store;
+    private readonly IConfigurationService _configService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EnvironmentConfigInitializer> _logger;
 
     public EnvironmentConfigInitializer(
         IConfigurationStore store,
+        IConfigurationService configService,
         IConfiguration configuration,
         ILogger<EnvironmentConfigInitializer> logger)
     {
         _store = store;
+        _configService = configService;
         _configuration = configuration;
         _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken ct)
+    {
+        await ApplySettingsOverridesAsync(ct);
+        await ApplyDomainOverridesAsync(ct);
+    }
+
+    private async Task ApplySettingsOverridesAsync(CancellationToken ct)
     {
         var settings = await _store.GetSettingsAsync(ct);
         var changed = false;
@@ -62,6 +71,18 @@ internal sealed class EnvironmentConfigInitializer : IHostedService
         {
             await _store.UpdateSettingsAsync(settings, ct);
         }
+    }
+
+    private async Task ApplyDomainOverridesAsync(CancellationToken ct)
+    {
+        var envConfig = EnvironmentVariableProvider.Load();
+        if (envConfig is null)
+        {
+            return;
+        }
+
+        _logger.LogInformation("Applying {Count} domain(s) from DOMAINS environment variable", envConfig.Entries.Count);
+        await EnvironmentVariableProvider.ApplyOverridesAsync(envConfig, _configService, ct);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

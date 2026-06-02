@@ -3,6 +3,9 @@
   <Project Path="Schleusenwerk.Core/Schleusenwerk.Core.csproj" />
   <Project Path="Schleusenwerk.Contracts/Schleusenwerk.Contracts.csproj" />
   <Project Path="Schleusenwerk.IntegrationTests/Schleusenwerk.IntegrationTests.csproj" />
+  <Folder Name="/Aspire/">
+    <Project Path="Schleusenwerk.AppHost/Schleusenwerk.AppHost.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="../.dockerignore" />
     <File Path="../.github/workflows/ci.yml" />

@@ -51,6 +51,16 @@ public sealed class ToxiproxyClient : IDisposable
         => AddToxicAsync(proxyName, toxicName, "timeout", stream,
             new Dictionary<string, object> { ["timeout"] = timeoutMs }, ct);
 
+    public Task AddBandwidthAsync(string proxyName, string toxicName, long rate,
+        string stream = "downstream", CancellationToken ct = default)
+        => AddToxicAsync(proxyName, toxicName, "bandwidth", stream,
+            new Dictionary<string, object> { ["rate"] = rate }, ct);
+
+    public Task AddLimitDataAsync(string proxyName, string toxicName, long bytes,
+        string stream = "downstream", CancellationToken ct = default)
+        => AddToxicAsync(proxyName, toxicName, "limit_data", stream,
+            new Dictionary<string, object> { ["bytes"] = bytes }, ct);
+
     public async Task RemoveToxicAsync(string proxyName, string toxicName, CancellationToken ct = default)
     {
         var response = await _http.DeleteAsync($"/proxies/{proxyName}/toxics/{toxicName}", ct);

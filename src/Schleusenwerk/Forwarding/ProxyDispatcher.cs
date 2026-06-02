@@ -96,6 +96,7 @@ internal sealed class ProxyDispatcher : IProxyDispatcher
             return;
         }
 
+        context.Items["Upstream"] = upstream.Url.Value.ToString();
         var sw = Stopwatch.StartNew();
         await _pipeline.ForwardAsync(context, upstream, config, _headerFilter);
         sw.Stop();

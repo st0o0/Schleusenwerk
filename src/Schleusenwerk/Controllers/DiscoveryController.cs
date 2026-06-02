@@ -16,7 +16,7 @@ public sealed class DiscoveryController : ControllerBase
     public DiscoveryController(IReadOnlyActorRegistry registry)
     {
         registry.TryGet<DockerDiscoveryActor>(out var actorRef);
-        _discoveryActor = actorRef;
+        _discoveryActor = actorRef is Akka.Actor.Nobody ? null : actorRef;
     }
 
     [HttpGet("containers")]

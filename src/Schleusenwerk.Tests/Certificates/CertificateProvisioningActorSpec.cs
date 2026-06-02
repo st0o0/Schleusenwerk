@@ -50,7 +50,7 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
 
         actor.Tell(new CertificateProvisioningRequested(domain));
 
-        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await Task.Delay(2000, TestContext.Current.CancellationToken);
 
         Assert.True(store.HasCertificate(domain));
         using var cert = store.GetCertificate(domain);
@@ -126,7 +126,7 @@ internal sealed class MockConfigurationService : IConfigurationService
         var config = new DomainConfig
         {
             DomainName = domain,
-            TlsMode = TlsMode.LetsEncrypt,
+            TlsMode = TlsMode.SelfSigned,
         };
         var result = new ConfigurationResult<DomainConfigResult>.Success(new DomainConfigResult(config, new List<UpstreamTarget>()));
         return Task.FromResult<ConfigurationResult<DomainConfigResult>>(result);

@@ -288,9 +288,10 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         var self = Self;
         var progress = new Progress<Message>(msg =>
         {
-            if (msg.Type == "container")
+            if (msg.Type == "container" && msg.Actor?.ID is not null)
             {
-                self.Tell(new ContainerEvent(msg.ID, msg.Status));
+                var status = msg.Action ?? msg.Status;
+                self.Tell(new ContainerEvent(msg.Actor.ID, status));
             }
         });
 

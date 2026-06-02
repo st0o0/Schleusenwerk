@@ -5,6 +5,7 @@ using Akka.Persistence;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Metrics;
 using Schleusenwerk.Persistence;
 using Servus.Akka;
 
@@ -20,6 +21,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     private readonly IActorRef _healthCheckRegion;
     private readonly IActorRef _eventHub;
     private readonly IConfigurationStore _configStore;
+    private readonly ProxyMetrics _metrics;
     private IMaterializer _materializer = null!;
     private ISourceQueueWithComplete<IClusterEvent>? _publishQueue;
 
@@ -29,9 +31,10 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     private readonly Dictionary<UpstreamUrl, UpstreamCircuitState> _circuitStates = new();
     private int _roundRobinIndex;
 
-    public DomainEntityActor(IConfigurationStore configStore)
+    public DomainEntityActor(IConfigurationStore configStore, ProxyMetrics metrics)
     {
         _configStore = configStore;
+        _metrics = metrics;
         _healthCheckRegion = Context.GetActor<HealthCheckEntityActor>();
         _eventHub = Context.GetActor<EventHub>();
 
@@ -112,7 +115,12 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
         Command<RequestFailed>(msg =>
         {
             var state = GetCircuitState(msg.Url);
+            var wasClosed = state.Status != CircuitStatus.Open;
             state.RecordFailure();
+            if (wasClosed && state.Status == CircuitStatus.Open)
+            {
+                _metrics.RecordCircuitBreakerTrip(msg.Domain, msg.Url.Value.ToString());
+            }
         });
         Command<RequestSucceeded>(msg =>
         {

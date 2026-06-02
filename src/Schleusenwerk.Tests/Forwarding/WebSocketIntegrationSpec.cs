@@ -2,6 +2,7 @@ using Akka.Actor;
 using Akka.Hosting;
 using Akka.Persistence.TestKit;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Metrics;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
@@ -28,7 +29,7 @@ public sealed class WebSocketIntegrationSpec : PersistenceTestKit
             $"Data Source=test-ws-{id}-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
 
         var domainActor = Sys.ActorOf(
-            Props.Create(() => new DomainEntityActor(store)),
+            Props.Create(() => new DomainEntityActor(store, new ProxyMetrics())),
             $"domain-ws-{id}");
         registry.Register<DomainEntityActor>(domainActor, overwrite: true);
 

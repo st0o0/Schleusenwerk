@@ -7,6 +7,7 @@ using Akka.Remote.Hosting;
 using LinqToDB;
 using Schleusenwerk.Certificates;
 using Schleusenwerk.Discovery;
+using Schleusenwerk.Metrics;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
@@ -41,10 +42,11 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             entityIdExtractor: msg => (msg as IWithEntityId)?.EntityId);
 
         var configStore = serviceProvider.GetRequiredService<IConfigurationStore>();
+        var metrics = serviceProvider.GetRequiredService<ProxyMetrics>();
 
         builder.WithShardRegion<DomainEntityActor>(
             "domain-router",
-            _ => Props.Create(() => new DomainEntityActor(configStore)),
+            _ => Props.Create(() => new DomainEntityActor(configStore, metrics)),
             messageExtractor,
             new ShardOptions
             {

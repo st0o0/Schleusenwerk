@@ -120,7 +120,7 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        Client.Dispose();
+        Client?.Dispose();
 
         if (_app != null)
         {
@@ -170,9 +170,9 @@ public sealed class SchleusenwerkTestHost : IAsyncLifetime
     private async Task WaitForReady(CancellationToken ct)
     {
         Exception? lastException = null;
-        int lastStatusCode = 0;
+        var lastStatusCode = 0;
         const int maxAttempts = 60; // 60 * 500ms = 30 seconds
-        int attempts = 0;
+        var attempts = 0;
 
         while (attempts < maxAttempts)
         {

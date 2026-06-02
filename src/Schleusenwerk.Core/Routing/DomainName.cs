@@ -27,12 +27,7 @@ public readonly record struct DomainName
 
         var hostPart = isWildcard ? normalized[2..] : normalized;
 
-        if (hostPart.Length == 0)
-        {
-            throw new FormatException($"Invalid domain name: '{input}'.");
-        }
-
-        if (hostPart.StartsWith('.') || hostPart.EndsWith('.'))
+        if (hostPart.Length == 0 || hostPart.StartsWith('.') || hostPart.EndsWith('.'))
         {
             throw new FormatException($"Invalid domain name: '{input}'.");
         }

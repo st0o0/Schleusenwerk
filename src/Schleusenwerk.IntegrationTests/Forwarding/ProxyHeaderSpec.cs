@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Schleusenwerk.IntegrationTests.Infrastructure;
 using Xunit;
 

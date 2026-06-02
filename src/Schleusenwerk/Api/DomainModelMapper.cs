@@ -1,5 +1,4 @@
 using System.Security.Cryptography.X509Certificates;
-using Schleusenwerk.Certificates;
 using Schleusenwerk.HealthCheck;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;

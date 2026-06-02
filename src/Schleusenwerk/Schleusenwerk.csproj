@@ -9,6 +9,9 @@
         <PackageReference Include="Servus.Akka" />
         <PackageReference Include="Servus.Core" />
         <PackageReference Include="OpenTelemetry.Api" />
+        <PackageReference Include="Serilog.AspNetCore" />
+        <PackageReference Include="Serilog.Sinks.File" />
+        <PackageReference Include="Serilog.Sinks.Console" />
     </ItemGroup>
 
     <ItemGroup>

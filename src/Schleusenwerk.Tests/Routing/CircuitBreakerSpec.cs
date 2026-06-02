@@ -38,46 +38,46 @@ public sealed class CircuitBreakerSpec
     }
 
     [Fact(Timeout = 5000)]
-    public void CircuitBreaker_should_transition_to_half_open_after_cooldown()
+    public async Task CircuitBreaker_should_transition_to_half_open_after_cooldown()
     {
         var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
         Assert.Equal(CircuitStatus.Open, state.Status);
-        Thread.Sleep(100);
+        await Task.Delay(100);
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         Assert.True(state.IsAvailable);
     }
 
     [Fact(Timeout = 5000)]
-    public void CircuitBreaker_should_close_on_success_when_half_open()
+    public async Task CircuitBreaker_should_close_on_success_when_half_open()
     {
         var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
-        Thread.Sleep(100);
+        await Task.Delay(100);
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         state.RecordSuccess();
         Assert.Equal(CircuitStatus.Closed, state.Status);
     }
 
     [Fact(Timeout = 5000)]
-    public void CircuitBreaker_should_reopen_with_doubled_cooldown_on_failure_when_half_open()
+    public async Task CircuitBreaker_should_reopen_with_doubled_cooldown_on_failure_when_half_open()
     {
         var state = new UpstreamCircuitState(UpstreamUrl.Parse("http://a:8080"), TimeSpan.FromMilliseconds(50));
         state.RecordFailure();
         state.RecordFailure();
         state.RecordFailure();
-        Thread.Sleep(100);
+        await Task.Delay(100);
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
         state.RecordFailure();
         Assert.Equal(CircuitStatus.Open, state.Status);
         // Should NOT be half-open after 50ms anymore (doubled to 100ms)
-        Thread.Sleep(60);
+        await Task.Delay(60);
         Assert.Equal(CircuitStatus.Open, state.Status);
-        Thread.Sleep(60);
+        await Task.Delay(60);
         Assert.Equal(CircuitStatus.HalfOpen, state.Status);
     }
 

@@ -283,16 +283,19 @@ public sealed class DockerDiscoveryActor : ReceiveActor, IWithTimers
         _monitorCts = new CancellationTokenSource();
         var token = _monitorCts.Token;
 
+        // Capture Self before the callback — Progress<T> runs on a thread-pool thread
+        // where no ActorContext is available
+        var self = Self;
         var progress = new Progress<Message>(msg =>
         {
             if (msg.Type == "container")
             {
-                Self.Tell(new ContainerEvent(msg.ID, msg.Status));
+                self.Tell(new ContainerEvent(msg.ID, msg.Status));
             }
         });
 
         _client!.System.MonitorEventsAsync(new ContainerEventsParameters(), progress, token)
-            .PipeTo(Self,
+            .PipeTo(self,
                 success: () => new MonitoringEnded(null),
                 failure: ex => ex is OperationCanceledException
                     ? Noop.Instance

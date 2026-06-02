@@ -95,12 +95,12 @@ internal sealed class InMemoryConfigurationStore : IConfigurationStore
 
     public Task<IReadOnlyList<DomainConfig>> GetAllDomainsAsync(CancellationToken ct = default)
     {
-        return Task.FromResult((IReadOnlyList<DomainConfig>)new List<DomainConfig>());
+        return Task.FromResult<IReadOnlyList<DomainConfig>>(new List<DomainConfig>());
     }
 
     public Task<DomainConfig?> GetDomainAsync(DomainName name, CancellationToken ct = default)
     {
-        return Task.FromResult((DomainConfig?)null);
+        return Task.FromResult<DomainConfig?>(null);
     }
 
     public Task UpsertDomainAsync(DomainConfig config, CancellationToken ct = default)
@@ -128,8 +128,8 @@ internal sealed class MockConfigurationService : IConfigurationService
             DomainName = domain,
             TlsMode = TlsMode.LetsEncrypt,
         };
-        var result = new ConfigurationResult<DomainConfigResult>.Success(new DomainConfigResult(config, (IReadOnlyList<UpstreamTarget>)new List<UpstreamTarget>()));
-        return Task.FromResult((ConfigurationResult<DomainConfigResult>)result);
+        var result = new ConfigurationResult<DomainConfigResult>.Success(new DomainConfigResult(config, new List<UpstreamTarget>()));
+        return Task.FromResult<ConfigurationResult<DomainConfigResult>>(result);
     }
 
     public Task<ConfigurationResult> AddDomainAsync(DomainConfig config, CancellationToken cancellationToken = default)

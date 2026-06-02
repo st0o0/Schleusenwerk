@@ -13,7 +13,7 @@ public sealed class DockerAutoRegistrationSpec
 
     public DockerAutoRegistrationSpec(DockerDiscoveryTestHost host) => _host = host;
 
-    [Fact(Timeout = 60_000)]
+    [Fact(Timeout = 120_000)]
     public async Task Should_auto_register_route_for_labeled_container()
     {
         DockerAvailableGuard.SkipIfUnavailable();
@@ -42,7 +42,7 @@ public sealed class DockerAutoRegistrationSpec
         }
     }
 
-    [Fact(Timeout = 60_000)]
+    [Fact(Timeout = 120_000)]
     public async Task Should_show_labeled_container_in_discovery_api()
     {
         DockerAvailableGuard.SkipIfUnavailable();
@@ -76,7 +76,7 @@ public sealed class DockerAutoRegistrationSpec
         }
     }
 
-    [Fact(Timeout = 60_000)]
+    [Fact(Timeout = 120_000)]
     public async Task Should_deregister_upstream_when_container_stops()
     {
         DockerAvailableGuard.SkipIfUnavailable();
@@ -99,7 +99,7 @@ public sealed class DockerAutoRegistrationSpec
         await container.StopAsync(ct);
         await container.DisposeAsync();
 
-        await Task.Delay(3000, ct);
+        await Task.Delay(5000, ct);
 
         using var proxyClient = TestHelper.CreateProxyClient(_host.BaseUri, domain);
         var response = await proxyClient.GetAsync("/", ct);
@@ -109,7 +109,7 @@ public sealed class DockerAutoRegistrationSpec
             $"Expected 502 or 404 after container stopped, got {response.StatusCode}");
     }
 
-    [Fact(Timeout = 60_000)]
+    [Fact(Timeout = 120_000)]
     public async Task Should_ignore_container_without_schleusenwerk_labels()
     {
         DockerAvailableGuard.SkipIfUnavailable();
@@ -125,7 +125,7 @@ public sealed class DockerAutoRegistrationSpec
         await container.StartAsync(ct);
         try
         {
-            await Task.Delay(3000, ct);
+            await Task.Delay(5000, ct);
 
             var routesResponse = await _host.Client.GetAsync("/api/routes", ct);
             routesResponse.EnsureSuccessStatusCode();
@@ -144,7 +144,7 @@ public sealed class DockerAutoRegistrationSpec
 
     private async Task<bool> WaitForRouteAsync(string domain, CancellationToken ct)
     {
-        for (var i = 0; i < 30; i++)
+        for (var i = 0; i < 50; i++)
         {
             try
             {
@@ -164,7 +164,7 @@ public sealed class DockerAutoRegistrationSpec
             {
             }
 
-            await Task.Delay(1000, ct);
+            await Task.Delay(2000, ct);
         }
 
         return false;

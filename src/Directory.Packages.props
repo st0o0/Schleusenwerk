@@ -18,7 +18,7 @@
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.14"/>
     </ItemGroup>
     <ItemGroup Label="Docker">
-        <PackageVersion Include="Docker.DotNet" Version="3.125.15"/>
+        <PackageVersion Include="Docker.DotNet.Enhanced" Version="3.128.1"/>
     </ItemGroup>
     <ItemGroup Label="Telemetry">
         <PackageVersion Include="OpenTelemetry.Api" Version="1.12.0"/>

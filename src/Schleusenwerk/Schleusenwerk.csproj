@@ -4,7 +4,7 @@
         <PackageReference Include="Akka.Streams" />
         <PackageReference Include="Akka.Cluster.Hosting" />
         <PackageReference Include="Akka.Persistence.Sql.Hosting" />
-        <PackageReference Include="Docker.DotNet" />
+        <PackageReference Include="Docker.DotNet.Enhanced" />
         <PackageReference Include="Microsoft.Data.Sqlite" />
         <PackageReference Include="Servus.Akka" />
         <PackageReference Include="Servus.Core" />

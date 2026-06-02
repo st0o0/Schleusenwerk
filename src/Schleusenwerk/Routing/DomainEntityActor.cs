@@ -51,7 +51,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     protected override void PreStart()
     {
         base.PreStart();
-        _materializer = Context.System.Materializer();
+        _materializer = Context.Materializer();
         _eventHub.Ask<EventHub.PublisherReady>(EventHub.GetPublisher.Instance)
             .PipeTo(Self);
     }
@@ -63,6 +63,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             state = new UpstreamCircuitState(url, TimeSpan.FromSeconds(30));
             _circuitStates[url] = state;
         }
+
         return state;
     }
 
@@ -96,7 +97,9 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     {
         Command<EventHub.Subscribed>(msg =>
         {
-            msg.SourceRef.Source.RunWith(Sink.ActorRef<IClusterEvent>(Self, StreamCompleted.Instance, ex => new StreamFailed(ex)), _materializer);
+            msg.SourceRef.Source.RunWith(
+                Sink.ActorRef<IClusterEvent>(Self, StreamCompleted.Instance, ex => new StreamFailed(ex)),
+                _materializer);
         });
         Command<AddDomain>(HandleAddDomain);
         Command<UpdateDomain>(HandleUpdateDomain);
@@ -132,20 +135,11 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
                 GetCircuitState(msg.Url).ForceOpen();
             }
         });
-        Command<Status.Failure>(f =>
-        {
-            _log.Warning(f.Cause, "Stream or async operation failed");
-        });
+        Command<Status.Failure>(f => { _log.Warning(f.Cause, "Stream or async operation failed"); });
         Command<StreamCompleted>(_ => { });
-        Command<StreamFailed>(f =>
-        {
-            _log.Warning(f.Ex, "Event subscription stream failed");
-        });
+        Command<StreamFailed>(f => { _log.Warning(f.Ex, "Event subscription stream failed"); });
         Command<PublishDropped>(_ => { });
-        Command<PublishFailed>(f =>
-        {
-            _log.Warning(f.Exception, "Failed to publish event to hub");
-        });
+        Command<PublishFailed>(f => { _log.Warning(f.Exception, "Failed to publish event to hub"); });
         Command<IDomainEvent>(_ => { });
     }
 
@@ -324,5 +318,6 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
     private sealed record StreamFailed(Exception Ex);
 
     private sealed record PublishDropped(IClusterEvent Event);
+
     private sealed record PublishFailed(Exception Exception);
 }

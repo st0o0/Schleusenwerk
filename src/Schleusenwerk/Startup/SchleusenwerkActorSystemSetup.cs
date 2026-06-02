@@ -44,7 +44,7 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
 
         builder.WithShardRegion<DomainEntityActor>(
             "domain-router",
-            entityId => Props.Create(() => new DomainEntityActor(configStore)),
+            _ => Props.Create(() => new DomainEntityActor(configStore)),
             messageExtractor,
             new ShardOptions
             {

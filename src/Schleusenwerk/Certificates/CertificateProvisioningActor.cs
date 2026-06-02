@@ -54,7 +54,6 @@ public sealed class CertificateProvisioningActor : ReceiveActor, IWithTimers
 
     protected override void PreStart()
     {
-        base.PreStart();
         _eventHub.Ask<EventHub.Subscribed>(EventHub.Subscribe<ICertificateEvent>.Instance)
             .PipeTo(Self);
 

@@ -42,7 +42,7 @@ public sealed class HealthCheckEntityActor : ReceiveActor, IWithTimers, IWithUnb
 
     protected override void PreStart()
     {
-        _materializer = Context.System.Materializer();
+        _materializer = Context.Materializer();
         _eventHub.Ask<EventHub.PublisherReady>(EventHub.GetPublisher.Instance)
             .PipeTo(Self);
     }

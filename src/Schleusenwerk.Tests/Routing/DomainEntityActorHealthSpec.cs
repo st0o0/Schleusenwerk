@@ -2,6 +2,7 @@ using Akka.Actor;
 using Akka.Hosting;
 using Akka.Persistence.TestKit;
 using Schleusenwerk.HealthCheck;
+using Schleusenwerk.Metrics;
 using Schleusenwerk.Persistence;
 using Schleusenwerk.Routing;
 using Xunit;
@@ -25,7 +26,7 @@ public sealed class DomainEntityActorHealthSpec : PersistenceTestKit
             $"Data Source=health-{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
 
         return Sys.ActorOf(
-            Props.Create(() => new DomainEntityActor(store)),
+            Props.Create(() => new DomainEntityActor(store, new ProxyMetrics())),
             $"entity-health-{Guid.NewGuid():N}");
     }
 

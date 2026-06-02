@@ -3,6 +3,7 @@ using Servus.Core.Application.Startup;
 
 var runner = AppBuilder.Create()
     .WithSetup<SchleusenwerkLoggingSetup>()
+    .WithSetup<SchleusenwerkTelemetrySetup>()
     .WithSetup<SchleusenwerkActorSystemSetup>()
     .WithSetup<SchleusenwerkServicesSetup>()
     .WithSetup<SchleusenwerkApplicationSetup>()

@@ -1,8 +1,4 @@
 :3000 {
-	root * /srv
-	file_server
-	try_files {path} /index.html
-
 	handle /api/* {
 		reverse_proxy proxy:5000
 	}
@@ -13,6 +9,12 @@
 
 	handle /health {
 		respond "ok" 200
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
 	}
 
 	encode gzip zstd

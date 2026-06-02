@@ -5,13 +5,14 @@ var sample = builder.AddContainer("sample", "nginxdemos/hello", "latest")
 
 var proxy = builder.AddContainer("proxy", "ghcr.io/st0o0/schleusenwerk", "edge")
     .WithHttpEndpoint(port: 1312, targetPort: 80, name: "http")
-    .WithHttpsEndpoint(port: 1313, targetPort: 443, name: "https")
     .WithHttpEndpoint(port: 5000, targetPort: 5000, name: "management")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-    .WithEnvironment("ASPNETCORE_URLS", "http://+:80;https://+:443;http://+:5000")
+    .WithEnvironment("ASPNETCORE_URLS", "http://+:80;http://+:5000")
     .WithEnvironment("STAGE", "local")
     .WithEnvironment("Docker__Enabled", "false")
     .WithEnvironment("Cors__AllowedOrigins", "http://localhost:3000,http://localhost:5173")
+    .WithEnvironment("OTEL_SERVICE_NAME", "schleusenwerk")
+    .WithOtlpExporter()
     .WithEnvironment(ctx =>
     {
         var sampleEndpoint = sample.GetEndpoint("http");
@@ -22,8 +23,11 @@ var proxy = builder.AddContainer("proxy", "ghcr.io/st0o0/schleusenwerk", "edge")
     .WithVolume("schleusenwerk-certs", "/certs")
     .WaitFor(sample);
 
+var caddyfile = Path.Combine(builder.AppHostDirectory, "..", "Schleusenwerk.Web", "Caddyfile");
+
 var web = builder.AddContainer("web", "ghcr.io/st0o0/schleusenwerk-web", "edge")
     .WithHttpEndpoint(port: 3000, targetPort: 3000, name: "ui")
+    .WithBindMount(caddyfile, "/etc/caddy/Caddyfile", isReadOnly: true)
     .WaitFor(proxy);
 
 builder.Build().Run();

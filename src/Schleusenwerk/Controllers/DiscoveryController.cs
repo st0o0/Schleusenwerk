@@ -10,17 +10,23 @@ namespace Schleusenwerk.Controllers;
 [Route("api/discovery")]
 public sealed class DiscoveryController : ControllerBase
 {
-    private readonly IActorRef _discoveryActor;
+    private readonly IActorRef? _discoveryActor;
     private readonly TimeSpan _timeout = TimeSpan.FromSeconds(5);
 
     public DiscoveryController(IReadOnlyActorRegistry registry)
     {
-        _discoveryActor = registry.Get<DockerDiscoveryActor>();
+        registry.TryGet<DockerDiscoveryActor>(out var actorRef);
+        _discoveryActor = actorRef;
     }
 
     [HttpGet("containers")]
     public async Task<ActionResult<IReadOnlyList<DiscoveredContainerDto>>> ListContainers(CancellationToken ct)
     {
+        if (_discoveryActor is null)
+        {
+            return Ok(Array.Empty<DiscoveredContainerDto>());
+        }
+
         var result = await _discoveryActor.Ask<DiscoveredContainersResult>(
             GetDiscoveredContainers.Instance, _timeout, ct);
 

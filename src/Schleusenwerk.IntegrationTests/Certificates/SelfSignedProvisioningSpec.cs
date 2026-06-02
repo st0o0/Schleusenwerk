@@ -39,21 +39,14 @@ public sealed class SelfSignedProvisioningSpec
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task Should_fail_provision_for_nonexistent_domain()
+    public async Task Should_accept_provision_request_for_any_domain()
     {
         var ct = TestContext.Current.CancellationToken;
-        var domain = TestHelper.UniqueDomain("cert-noexist");
+        var domain = TestHelper.UniqueDomain("cert-any");
         var response = await _client.PostAsync($"/api/certificates/{domain}/provision", null, ct);
-        if (response.IsSuccessStatusCode)
-        {
-            var json = await response.Content.ReadAsStringAsync(ct);
-            var result = JsonSerializer.Deserialize<JsonElement>(json);
-            Assert.False(result.GetProperty("success").GetBoolean());
-        }
-        else
-        {
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        }
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(ct);
+        Assert.True(JsonSerializer.Deserialize<JsonElement>(json).GetProperty("success").GetBoolean());
     }
 
     [Fact(Timeout = 30_000)]

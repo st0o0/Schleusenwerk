@@ -39,7 +39,8 @@ public sealed class DockerDiscoveryTestHost : IAsyncLifetime
 
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Akka:Persistence:ConnectionString"] = $"Data Source=docker-test-{Guid.NewGuid():N};Mode=Memory;Cache=Shared",
+                ["Akka:Persistence:ConnectionString"] =
+                    $"Data Source=docker-test-{Guid.NewGuid():N};Mode=Memory;Cache=Shared",
                 ["Certificates:Path"] = _tempCertsDirectory,
                 ["Lego:WebrootPath"] = _tempWebrootDirectory,
                 ["Docker:Enabled"] = "true",
@@ -73,9 +74,9 @@ public sealed class DockerDiscoveryTestHost : IAsyncLifetime
 
             var server = _app.Services.GetRequiredService<IServer>();
             var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses
-                ?? throw new InvalidOperationException("No server addresses available");
+                            ?? throw new InvalidOperationException("No server addresses available");
             var url = addresses.FirstOrDefault()
-                ?? throw new InvalidOperationException("Kestrel did not bind to any URL");
+                      ?? throw new InvalidOperationException("Kestrel did not bind to any URL");
 
             BaseUri = new Uri(url);
             Client = new HttpClient { BaseAddress = BaseUri };
@@ -89,6 +90,7 @@ public sealed class DockerDiscoveryTestHost : IAsyncLifetime
                 await _app.StopAsync();
                 await _app.DisposeAsync();
             }
+
             CleanupTempDirectories();
             throw;
         }
@@ -118,6 +120,7 @@ public sealed class DockerDiscoveryTestHost : IAsyncLifetime
         }
         catch
         {
+            // noop
         }
 
         try
@@ -129,6 +132,7 @@ public sealed class DockerDiscoveryTestHost : IAsyncLifetime
         }
         catch
         {
+            // noop
         }
     }
 

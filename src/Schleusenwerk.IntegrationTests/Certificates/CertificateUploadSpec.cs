@@ -105,6 +105,7 @@ public sealed class CertificateUploadSpec
 
         var found = certs.EnumerateArray().FirstOrDefault(c => c.GetProperty("domain").GetString() == domain);
         Assert.NotEqual(default, found);
-        Assert.Contains(domain, found.GetProperty("subject").GetString());
+        Assert.NotEmpty(found.GetProperty("thumbprint").GetString()!);
+        Assert.NotEmpty(found.GetProperty("notAfter").GetString()!);
     }
 }

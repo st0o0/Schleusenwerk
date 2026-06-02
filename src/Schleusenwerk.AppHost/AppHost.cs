@@ -1,9 +1,12 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var sample = builder.AddContainer("sample", "nginxdemos/hello", "latest")
-    .WithHttpEndpoint(targetPort: 8080, name: "http");
+var src = Path.Combine(builder.AppHostDirectory, "..");
+var root = Path.Combine(src, "..");
 
-var proxy = builder.AddContainer("proxy", "ghcr.io/st0o0/schleusenwerk", "edge")
+var sample = builder.AddContainer("sample", "nginxdemos/hello", "latest")
+    .WithHttpEndpoint(targetPort: 80, name: "http");
+
+var proxy = builder.AddDockerfile("proxy", root, Path.Combine(src, "Schleusenwerk", "Dockerfile"))
     .WithHttpEndpoint(port: 1312, targetPort: 80, name: "http")
     .WithHttpEndpoint(port: 5000, targetPort: 5000, name: "management")
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
@@ -13,17 +16,12 @@ var proxy = builder.AddContainer("proxy", "ghcr.io/st0o0/schleusenwerk", "edge")
     .WithEnvironment("Cors__AllowedOrigins", "http://localhost:3000,http://localhost:5173")
     .WithEnvironment("OTEL_SERVICE_NAME", "schleusenwerk")
     .WithOtlpExporter()
-    .WithEnvironment(ctx =>
-    {
-        var sampleEndpoint = sample.GetEndpoint("http");
-        ctx.EnvironmentVariables["DOMAINS"] = ReferenceExpression.Create(
-            $"sample.localhost -> {sampleEndpoint}");
-    })
+    .WithEnvironment("DOMAINS", "sample.localhost -> http://sample:80")
     .WithVolume("schleusenwerk-data", "/data")
     .WithVolume("schleusenwerk-certs", "/certs")
     .WaitFor(sample);
 
-var web = builder.AddContainer("web", "ghcr.io/st0o0/schleusenwerk-web", "edge")
+var web = builder.AddDockerfile("web", Path.Combine(src, "Schleusenwerk.Web"), "Dockerfile.prod")
     .WithHttpEndpoint(port: 3000, targetPort: 3000, name: "ui")
     .WaitFor(proxy);
 

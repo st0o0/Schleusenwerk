@@ -10,7 +10,7 @@ public readonly record struct UpstreamUrl
     public string Host => Value.Host;
     public int Port => Value.Port;
 
-    private UpstreamUrl(Uri value) => Value = value;
+    public UpstreamUrl(Uri value) => Value = value;
 
     public static UpstreamUrl Parse(string input)
     {

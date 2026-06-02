@@ -2,24 +2,30 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 
 WORKDIR /build
 
-COPY src/Directory.Build.props src/Directory.Packages.props* src/
+COPY src/global.json src/
+COPY src/Directory.Build.props src/Directory.Packages.props src/
 COPY src/Schleusenwerk/Schleusenwerk.csproj src/Schleusenwerk/
 COPY src/Schleusenwerk.Core/Schleusenwerk.Core.csproj src/Schleusenwerk.Core/
+COPY src/Schleusenwerk.Contracts/Schleusenwerk.Contracts.csproj src/Schleusenwerk.Contracts/
 
 RUN dotnet restore ./src/Schleusenwerk/Schleusenwerk.csproj
 
-COPY src/ ./src/
+COPY src/Schleusenwerk/ ./src/Schleusenwerk/
+COPY src/Schleusenwerk.Core/ ./src/Schleusenwerk.Core/
+COPY src/Schleusenwerk.Contracts/ ./src/Schleusenwerk.Contracts/
 
 RUN dotnet publish ./src/Schleusenwerk/Schleusenwerk.csproj \
         --configuration Release \
         --output /app \
         --no-restore
 
+FROM goacme/lego:v4 AS lego
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 
 RUN apk add --no-cache libgcc libstdc++
 
-COPY --from=goacme/lego /lego /usr/local/bin/lego
+COPY --from=lego /lego /usr/local/bin/lego
 
 WORKDIR /app
 

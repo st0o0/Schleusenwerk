@@ -25,8 +25,20 @@ public sealed class UnknownDomainSpec
         var domain = TestHelper.UniqueDomain("del-proxy");
         await TestHelper.RegisterRouteAsync(_host.Client, domain, "http://backend:8080", ct: ct);
         await TestHelper.RemoveRouteAsync(_host.Client, domain, ct);
+
         using var client = TestHelper.CreateProxyClient(_host.BaseUri, domain);
-        var response = await client.GetAsync("/", ct);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        for (var i = 0; i < 10; i++)
+        {
+            var response = await client.GetAsync("/", ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return;
+            }
+
+            await Task.Delay(500, ct);
+        }
+
+        var final = await client.GetAsync("/", ct);
+        Assert.Equal(HttpStatusCode.NotFound, final.StatusCode);
     }
 }

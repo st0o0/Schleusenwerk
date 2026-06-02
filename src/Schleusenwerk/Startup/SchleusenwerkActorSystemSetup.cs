@@ -50,7 +50,8 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             messageExtractor,
             new ShardOptions
             {
-                RememberEntities = true
+                RememberEntities = true,
+                Role = "schleusenwerk"
             });
 
         var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
@@ -66,7 +67,8 @@ public sealed class SchleusenwerkActorSystemSetup : ActorSystemSetupContainer
             messageExtractor,
             new ShardOptions
             {
-                RememberEntities = false
+                RememberEntities = false,
+                Role = "schleusenwerk"
             });
 
         var dockerEnabled = configuration.GetValue("Docker:Enabled", true);

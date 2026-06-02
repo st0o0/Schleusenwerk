@@ -23,11 +23,8 @@ var proxy = builder.AddContainer("proxy", "ghcr.io/st0o0/schleusenwerk", "edge")
     .WithVolume("schleusenwerk-certs", "/certs")
     .WaitFor(sample);
 
-var caddyfile = Path.Combine(builder.AppHostDirectory, "..", "Schleusenwerk.Web", "Caddyfile");
-
 var web = builder.AddContainer("web", "ghcr.io/st0o0/schleusenwerk-web", "edge")
     .WithHttpEndpoint(port: 3000, targetPort: 3000, name: "ui")
-    .WithBindMount(caddyfile, "/etc/caddy/Caddyfile", isReadOnly: true)
     .WaitFor(proxy);
 
-builder.Build().Run();
+await builder.Build().RunAsync();

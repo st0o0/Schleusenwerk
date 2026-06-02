@@ -119,7 +119,7 @@ public static class EnvironmentVariableProvider
                 await service.UpdateDomainAsync(domainConfig, cancellationToken);
             }
 
-            if (!entry.IsRedirect && entry.Upstream is not null)
+            if (entry is { IsRedirect: false, Upstream: not null })
             {
                 await service.AddUpstreamAsync(entry.DomainName, entry.Upstream, cancellationToken);
             }

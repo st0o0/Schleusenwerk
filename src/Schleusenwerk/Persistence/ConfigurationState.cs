@@ -44,7 +44,7 @@ public sealed class ConfigurationState
     public void Apply(DomainAdded evt)
     {
         _domains[evt.Config.DomainName] = evt.Config;
-        _upstreams[evt.Config.DomainName] = new List<UpstreamTarget>();
+        _upstreams[evt.Config.DomainName] = [];
         EventCount++;
     }
 
@@ -118,7 +118,7 @@ public sealed class ConfigurationState
         foreach (var domain in snapshot.Domains)
         {
             _domains[domain.DomainName] = domain;
-            _upstreams[domain.DomainName] = new List<UpstreamTarget>();
+            _upstreams[domain.DomainName] = [];
         }
 
         foreach (var kvp in snapshot.Upstreams)

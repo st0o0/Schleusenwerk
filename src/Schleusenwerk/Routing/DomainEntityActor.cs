@@ -1,5 +1,6 @@
 using Akka;
 using Akka.Actor;
+using Akka.Cluster.Sharding;
 using Akka.Event;
 using Akka.Persistence;
 using Akka.Streams;
@@ -219,7 +220,7 @@ public sealed class DomainEntityActor : ReceivePersistentActor, IWithUnboundedSt
             PublishEvent(persisted);
             Context.System.EventStream.Publish(new RouteRemoved(cmd.DomainName));
             Sender.Tell(ConfigurationCommandAck.Instance);
-            Self.Tell(PoisonPill.Instance);
+            Context.Parent.Tell(new Passivate(PoisonPill.Instance));
         });
     }
 

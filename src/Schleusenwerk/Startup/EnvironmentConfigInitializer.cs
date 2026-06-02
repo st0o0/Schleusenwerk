@@ -2,30 +2,36 @@ using Schleusenwerk.Persistence;
 
 namespace Schleusenwerk.Startup;
 
-internal sealed class EnvironmentConfigInitializer : IHostedService
+internal sealed class EnvironmentConfigInitializer : IHostedLifecycleService
 {
     private readonly IConfigurationStore _store;
-    private readonly IConfigurationService _configService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EnvironmentConfigInitializer> _logger;
 
     public EnvironmentConfigInitializer(
         IConfigurationStore store,
-        IConfigurationService configService,
+        IServiceProvider serviceProvider,
         IConfiguration configuration,
         ILogger<EnvironmentConfigInitializer> logger)
     {
         _store = store;
-        _configService = configService;
+        _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken ct)
-    {
-        await ApplySettingsOverridesAsync(ct);
-        await ApplyDomainOverridesAsync(ct);
-    }
+    public Task StartingAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken ct) => ApplySettingsOverridesAsync(ct);
+
+    public Task StartedAsync(CancellationToken ct) => ApplyDomainOverridesAsync(ct);
+
+    public Task StoppingAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public Task StoppedAsync(CancellationToken ct) => Task.CompletedTask;
 
     private async Task ApplySettingsOverridesAsync(CancellationToken ct)
     {
@@ -82,8 +88,7 @@ internal sealed class EnvironmentConfigInitializer : IHostedService
         }
 
         _logger.LogInformation("Applying {Count} domain(s) from DOMAINS environment variable", envConfig.Entries.Count);
-        await EnvironmentVariableProvider.ApplyOverridesAsync(envConfig, _configService, ct);
+        var configService = _serviceProvider.GetRequiredService<IConfigurationService>();
+        await EnvironmentVariableProvider.ApplyOverridesAsync(envConfig, configService, ct);
     }
-
-    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 }

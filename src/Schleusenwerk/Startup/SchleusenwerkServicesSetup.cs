@@ -22,6 +22,7 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
                 EnableMultipleHttp2Connections = true,
             });
         services.AddSingleton<ConnectionTracker>();
+        services.AddSingleton<AccessLogMiddleware>();
         services.AddHostedService<GracefulShutdownService>();
         services.AddSingleton<ProxyMetrics>();
         services.AddSingleton<RequestForwardingPipeline>();
@@ -56,7 +57,7 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
             {
                 options.ConfigureHttpsDefaults(adapterOptions =>
                 {
-                    var selector = options.ApplicationServices!.GetRequiredService<SniCertificateSelector>();
+                    var selector = options.ApplicationServices.GetRequiredService<SniCertificateSelector>();
                     adapterOptions.ServerCertificateSelector = (_, hostname) => selector.Select(hostname);
                 });
             });
@@ -81,7 +82,5 @@ public sealed class SchleusenwerkServicesSetup : IServiceSetupContainer
         services.AddControllers();
         services.AddSignalR();
         services.AddHostedService<Hubs.EventBridgeService>();
-        services.AddSingleton<IMaterializer>(sp =>
-            sp.GetRequiredService<ActorSystem>().Materializer());
     }
 }

@@ -14,6 +14,9 @@ public sealed class SchleusenwerkApplicationSetup : ApplicationSetupContainer<We
         var tracker = app.Services.GetRequiredService<ConnectionTracker>();
         app.Use(tracker.InvokeAsync);
 
+        var accessLog = app.Services.GetRequiredService<AccessLogMiddleware>();
+        app.Use(accessLog.InvokeAsync);
+
         app.MapGet("/health", async (IConfigurationStore store, CancellationToken ct) =>
         {
             try

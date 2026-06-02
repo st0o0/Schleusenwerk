@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.3.0](https://github.com/st0o0/Schleusenwerk/compare/v0.2.1...v0.3.0) (2026-06-02)
+
+
+### Features
+
+* **actor:** improve actor context usage ([074c5d7](https://github.com/st0o0/Schleusenwerk/commit/074c5d7eec9eb5d4568afe5b3424a4ec64f24dd7))
+* add configurable Kestrel resource limits for production hardening ([c588f5b](https://github.com/st0o0/Schleusenwerk/commit/c588f5bbe75b5168e11191a784e8d429de1bfd85))
+* add ConnectionTracker middleware for graceful drain ([f3081ba](https://github.com/st0o0/Schleusenwerk/commit/f3081ba5d03bf044a59a6a9f5178e8cff44da765))
+* add GracefulShutdownService with configurable drain timeout ([fc5ac54](https://github.com/st0o0/Schleusenwerk/commit/fc5ac540da2a808dc19c853bced9b4b64fe313f3))
+* add Serilog logging with configurable sinks ([5288834](https://github.com/st0o0/Schleusenwerk/commit/5288834c12ca65a83234ba0e7dedecc143386cf9))
+* add structured access logging middleware with Serilog ([ea782bd](https://github.com/st0o0/Schleusenwerk/commit/ea782bdd5a71149f2843ec03aadc08a35957edb0))
+* enhance domain name validation and test suite ([b2efee0](https://github.com/st0o0/Schleusenwerk/commit/b2efee0947e77f88ee92b0d0c060fdce693e0856))
+* record circuit breaker trip metrics on state transition ([6ff6306](https://github.com/st0o0/Schleusenwerk/commit/6ff63061b95982a7ca349a1e605b383e94cb5ecb))
+* replace TurboHTTP with standard HttpClient for upstream forwarding ([9d45d79](https://github.com/st0o0/Schleusenwerk/commit/9d45d796adefafe9b7016d293698e38f2e11f713))
+* **tests:** add certificate provisioning gap coverage tests ([94a39af](https://github.com/st0o0/Schleusenwerk/commit/94a39af0dbed6fd1e68aa1535f3b596a1d91b163))
+* **tests:** add Docker auto-registration integration tests ([b20aa14](https://github.com/st0o0/Schleusenwerk/commit/b20aa14838474253b8e8432c7cb45c995fc1ed99))
+* **tests:** add DockerAvailableGuard for conditional test skipping ([2ff4864](https://github.com/st0o0/Schleusenwerk/commit/2ff4864d6fefe8335f0b387ae615b7582d6b9a5b))
+* **tests:** add DockerDiscoveryTestHost with Docker enabled ([bffce9b](https://github.com/st0o0/Schleusenwerk/commit/bffce9bf76b41c7923035cd2c028b5485da3dc09))
+* **tests:** add Resilience, Certificates, Api, Events integration specs ([3f6b82a](https://github.com/st0o0/Schleusenwerk/commit/3f6b82a464d4da57f7f0dc6c0aa807330c7f6bb0))
+* **tests:** add Routing and Forwarding integration specs ([bca57de](https://github.com/st0o0/Schleusenwerk/commit/bca57deed01f272d2d9804c8bd7903773d1a922d))
+* **tests:** add SchleusenwerkTestHost in-process fixture ([2a24bf9](https://github.com/st0o0/Schleusenwerk/commit/2a24bf9a4bad25ef275f2dd494b9bacb3e4eb10c))
+* **tests:** add TestContainer fixtures and TestHelper ([fad54da](https://github.com/st0o0/Schleusenwerk/commit/fad54dadffcf83e4ef49047adec6ac98421062e4))
+* **tests:** add Toxiproxy edge case tests for bandwidth, truncation, and recovery ([2306048](https://github.com/st0o0/Schleusenwerk/commit/23060480fb546bd0b6572d9cf69c74b53d63a109))
+* **tests:** replace Toxiproxy.Net with direct REST API client ([d613377](https://github.com/st0o0/Schleusenwerk/commit/d6133779758ffc7db160ee3d714376d8fb4cf329))
+
+
+### Bug Fixes
+
+* docker event deserialization and route deletion timing ([c8401b8](https://github.com/st0o0/Schleusenwerk/commit/c8401b8cd7c005c5823ef7248f6d8de580909648))
+* migrate to Docker.DotNet.Enhanced and fix actor threading bug ([9808602](https://github.com/st0o0/Schleusenwerk/commit/9808602f074ec0c58e1bfc8041d6e1cc48739e50))
+* resolve EventBridgeService stream compilation error ([7bf4072](https://github.com/st0o0/Schleusenwerk/commit/7bf40727e0f65e3eb45bc728bb94961e7b11f134))
+* resolve route-loss and EventBridge race condition showstoppers ([6cfb327](https://github.com/st0o0/Schleusenwerk/commit/6cfb3276d0353e75b6e0f368c86b974abdbf57fe))
+* **tests:** fix all integration test assertions ([34fcebe](https://github.com/st0o0/Schleusenwerk/commit/34fcebecd0bb4bf21cf5899c87a3e68419e7ba79))
+* **tests:** fix CertificateProvisioningActorSpec for CI stability ([c69b151](https://github.com/st0o0/Schleusenwerk/commit/c69b151e9c7e75431b0efa1afb6b6aaed1ab2b55))
+* **tests:** fix TestHost startup — port binding, controller discovery, Docker disable ([afa9f12](https://github.com/st0o0/Schleusenwerk/commit/afa9f1279f3eeb5bddc2b4f54c470b3cd7dcefc1))
+
 ## [0.2.1](https://github.com/st0o0/Schleusenwerk/compare/v0.2.0...v0.2.1) (2026-05-04)
 
 

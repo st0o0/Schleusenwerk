@@ -50,7 +50,7 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
 
         actor.Tell(new CertificateProvisioningRequested(domain));
 
-        await Task.Delay(2000, TestContext.Current.CancellationToken);
+        await TestHelpers.WaitUntilAsync(() => store.HasCertificate(domain));
 
         Assert.True(store.HasCertificate(domain));
         using var cert = store.GetCertificate(domain);
@@ -70,7 +70,7 @@ public sealed class CertificateProvisioningActorSpec : PersistenceTestKit
 
         actor.Tell(new CertificateProvisioningRequested(domain));
 
-        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await TestHelpers.WaitUntilAsync(() => store.HasCertificate(domain));
 
         using var loaded = store.GetCertificate(domain);
         Assert.Equal(originalThumbprint, loaded!.Thumbprint);

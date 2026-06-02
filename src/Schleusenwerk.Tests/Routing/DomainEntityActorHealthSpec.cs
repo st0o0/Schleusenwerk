@@ -57,7 +57,6 @@ public sealed class DomainEntityActorHealthSpec : PersistenceTestKit
         ExpectMsg<ConfigurationCommandAck>(Timeout);
 
         entity.Tell(new UpstreamHealthChanged(UpstreamUrl.Parse("http://backend:8080"), IsHealthy: false));
-        await Task.Delay(100);
 
         var result = await entity.Ask<DomainUpstreamHealthResult>(
             new GetDomainUpstreamHealth { Domain = "example.com" }, Timeout);

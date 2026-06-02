@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Schleusenwerk.IntegrationTests.Infrastructure;
 using Xunit;
@@ -35,5 +36,38 @@ public sealed class SelfSignedProvisioningSpec
         var json = await response.Content.ReadAsStringAsync(ct);
         var certs = JsonSerializer.Deserialize<JsonElement>(json);
         Assert.Contains(certs.EnumerateArray(), c => c.GetProperty("domain").GetString() == domain);
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Should_fail_provision_for_nonexistent_domain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var domain = TestHelper.UniqueDomain("cert-noexist");
+        var response = await _client.PostAsync($"/api/certificates/{domain}/provision", null, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync(ct);
+            var result = JsonSerializer.Deserialize<JsonElement>(json);
+            Assert.False(result.GetProperty("success").GetBoolean());
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Should_provision_idempotently()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var domain = TestHelper.UniqueDomain("cert-idempotent");
+        await TestHelper.RegisterRouteAsync(_client, domain, "http://backend:8080", ct: ct);
+        var response1 = await _client.PostAsync($"/api/certificates/{domain}/provision", null, ct);
+        response1.EnsureSuccessStatusCode();
+        await Task.Delay(1000, ct);
+        var response2 = await _client.PostAsync($"/api/certificates/{domain}/provision", null, ct);
+        response2.EnsureSuccessStatusCode();
+        var json = await response2.Content.ReadAsStringAsync(ct);
+        Assert.True(JsonSerializer.Deserialize<JsonElement>(json).GetProperty("success").GetBoolean());
     }
 }
